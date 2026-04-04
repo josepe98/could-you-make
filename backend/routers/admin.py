@@ -1,0 +1,140 @@
+import secrets
+from datetime import datetime, timezone, timedelta
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy import asc, desc
+from sqlalchemy.orm import Session
+from ..database import get_db
+from ..models import Ticket, AdminPassword, AdminSession
+from ..schemas import TicketAdmin, TicketUpdate, AdminLogin, ChangePassword
+from ..config import settings
+from ..auth import hash_password, verify_password
+
+router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+SESSION_COOKIE = "cym_session"
+SESSION_TTL_DAYS = 7
+
+
+def require_auth(request: Request, db: Session = Depends(get_db)):
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    session = db.query(AdminSession).filter(
+        AdminSession.token == token,
+        AdminSession.expires_at > datetime.now(timezone.utc),
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return token
+
+
+def _check_password(password: str, db: Session) -> bool:
+    admin_pw = db.query(AdminPassword).first()
+    if admin_pw:
+        return verify_password(password, admin_pw.password_hash, admin_pw.salt)
+    return secrets.compare_digest(password, settings.ADMIN_PASSWORD)
+
+
+@router.post("/login")
+def login(creds: AdminLogin, response: Response, db: Session = Depends(get_db)):
+    if not _check_password(creds.password, db):
+        raise HTTPException(status_code=401, detail="Invalid password")
+    # Clean up expired sessions on each login
+    db.query(AdminSession).filter(AdminSession.expires_at <= datetime.now(timezone.utc)).delete()
+    token = secrets.token_urlsafe(32)
+    db.add(AdminSession(
+        token=token,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=SESSION_TTL_DAYS),
+    ))
+    db.commit()
+    response.set_cookie(
+        key=SESSION_COOKIE,
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * SESSION_TTL_DAYS,
+    )
+    return {"message": "Logged in"}
+
+
+@router.post("/logout")
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        db.query(AdminSession).filter(AdminSession.token == token).delete()
+        db.commit()
+    response.delete_cookie(SESSION_COOKIE)
+    return {"message": "Logged out"}
+
+
+@router.post("/change-password")
+def change_password(data: ChangePassword, db: Session = Depends(get_db), _auth: str = Depends(require_auth)):
+    if not _check_password(data.current_password, db):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    new_hash, new_salt = hash_password(data.new_password)
+    admin_pw = db.query(AdminPassword).first()
+    if admin_pw:
+        admin_pw.password_hash = new_hash
+        admin_pw.salt = new_salt
+    else:
+        db.add(AdminPassword(password_hash=new_hash, salt=new_salt))
+    db.commit()
+    return {"message": "Password updated"}
+
+
+@router.get("/tickets", response_model=list[TicketAdmin])
+def list_tickets(
+    request: Request,
+    db: Session = Depends(get_db),
+    _auth: str = Depends(require_auth),
+    app: Optional[str] = None,
+    type: Optional[str] = None,
+    status: Optional[str] = None,
+    sort_by: str = "created_at",
+    sort_dir: str = "desc",
+):
+    query = db.query(Ticket)
+    if app:
+        query = query.filter(Ticket.app == app)
+    if type:
+        query = query.filter(Ticket.type == type)
+    if status:
+        query = query.filter(Ticket.status == status)
+    sort_col = getattr(Ticket, sort_by, Ticket.created_at)
+    if sort_dir == "asc":
+        query = query.order_by(asc(sort_col))
+    else:
+        query = query.order_by(desc(sort_col))
+    return query.all()
+
+
+@router.get("/tickets/{ticket_id}", response_model=TicketAdmin)
+def get_ticket_admin(ticket_id: int, db: Session = Depends(get_db), _auth: str = Depends(require_auth)):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return ticket
+
+
+@router.patch("/tickets/{ticket_id}", response_model=TicketAdmin)
+def update_ticket(ticket_id: int, update: TicketUpdate, db: Session = Depends(get_db), _auth: str = Depends(require_auth)):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    for field, value in update.model_dump(exclude_none=True).items():
+        setattr(ticket, field, value)
+    db.commit()
+    db.refresh(ticket)
+    return ticket
+
+
+@router.delete("/tickets/{ticket_id}")
+def delete_ticket(ticket_id: int, db: Session = Depends(get_db), _auth: str = Depends(require_auth)):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    db.delete(ticket)
+    db.commit()
+    return {"message": "Ticket deleted"}

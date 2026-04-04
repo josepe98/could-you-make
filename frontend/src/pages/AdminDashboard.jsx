@@ -1,0 +1,353 @@
+import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { getAdminTickets, updateTicket, deleteTicket, adminLogout, changePassword } from '../api.js'
+
+const APP_LABELS = {
+  'life-folio': 'Life Folio',
+  'canopy': 'Canopy',
+  'kno': 'KNO Mgmt',
+  'practice-profiles': 'Practice Profiles',
+  'delta-mqds': 'delta-mqds',
+  'sampras': 'Sampras',
+}
+
+const STATUS_BADGE = {
+  'Open': 'badge-open',
+  'In Progress': 'badge-in-progress',
+  'Done': 'badge-done',
+  "Won't Fix": 'badge-wont-fix',
+}
+
+const PRIORITY_BADGE = {
+  'Low': 'badge-low',
+  'Medium': 'badge-medium',
+  'High': 'badge-high',
+  'Critical': 'badge-critical',
+}
+
+function SortHeader({ label, field, sortBy, sortDir, onSort }) {
+  const active = sortBy === field
+  const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+  return (
+    <th className="sortable" onClick={() => onSort(field)}>
+      {label}{arrow}
+    </th>
+  )
+}
+
+export default function AdminDashboard() {
+  const navigate = useNavigate()
+  const [tickets, setTickets] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [selected, setSelected] = useState(null)
+  const [editDraft, setEditDraft] = useState(null)
+  const [saving, setSaving] = useState(false)
+
+  const [filters, setFilters] = useState({ app: '', type: '', status: '' })
+  const [sortBy, setSortBy] = useState('created_at')
+  const [sortDir, setSortDir] = useState('desc')
+
+  const [showPwForm, setShowPwForm] = useState(false)
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
+  const [pwError, setPwError] = useState(null)
+  const [pwSuccess, setPwSuccess] = useState(false)
+  const [pwSaving, setPwSaving] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getAdminTickets({ ...filters, sort_by: sortBy, sort_dir: sortDir })
+      setTickets(data)
+    } catch (err) {
+      if (err.message === 'Unauthorized') navigate('/admin/login')
+      else setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [filters, sortBy, sortDir, navigate])
+
+  useEffect(() => { load() }, [load])
+
+  function handleSort(field) {
+    if (sortBy === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortBy(field); setSortDir('desc') }
+  }
+
+  function setFilter(k, v) {
+    setFilters(f => ({ ...f, [k]: v }))
+  }
+
+  async function handleInlineChange(ticket, field, value) {
+    try {
+      const updated = await updateTicket(ticket.id, { [field]: value })
+      setTickets(ts => ts.map(t => t.id === updated.id ? updated : t))
+      if (selected?.id === updated.id) setSelected(updated)
+    } catch (e) {
+      alert('Failed to update: ' + e.message)
+    }
+  }
+
+  function openDetail(ticket) {
+    setSelected(ticket)
+    setEditDraft({ ...ticket })
+  }
+
+  async function saveDetail() {
+    setSaving(true)
+    try {
+      const updated = await updateTicket(selected.id, {
+        title: editDraft.title,
+        description: editDraft.description,
+        type: editDraft.type,
+        admin_priority: editDraft.admin_priority || null,
+        status: editDraft.status,
+      })
+      setTickets(ts => ts.map(t => t.id === updated.id ? updated : t))
+      setSelected(updated)
+      setEditDraft({ ...updated })
+    } catch (e) {
+      alert('Failed to save: ' + e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(ticket) {
+    if (!confirm(`Delete ${ticket.display_id}? This cannot be undone.`)) return
+    try {
+      await deleteTicket(ticket.id)
+      setTickets(ts => ts.filter(t => t.id !== ticket.id))
+      if (selected?.id === ticket.id) setSelected(null)
+    } catch (e) {
+      alert('Failed to delete: ' + e.message)
+    }
+  }
+
+  async function handleLogout() {
+    await adminLogout()
+    navigate('/admin/login')
+  }
+
+  async function handleChangePassword(e) {
+    e.preventDefault()
+    setPwError(null)
+    setPwSuccess(false)
+    if (pwForm.next !== pwForm.confirm) {
+      setPwError('New passwords do not match')
+      return
+    }
+    if (pwForm.next.length < 8) {
+      setPwError('New password must be at least 8 characters')
+      return
+    }
+    setPwSaving(true)
+    try {
+      await changePassword(pwForm.current, pwForm.next)
+      setPwSuccess(true)
+      setPwForm({ current: '', next: '', confirm: '' })
+      setTimeout(() => { setShowPwForm(false); setPwSuccess(false) }, 2000)
+    } catch (err) {
+      setPwError(err.message)
+    } finally {
+      setPwSaving(false)
+    }
+  }
+
+  const displayId = t => t.display_id || `CYM-${String(t.id).padStart(3, '0')}`
+
+  return (
+    <div className="page" style={{ alignItems: 'flex-start', paddingTop: 32 }}>
+      <div className="card card-wide" style={{ maxWidth: 1100 }}>
+        <div className="admin-header">
+          <div>
+            <h1>Could You Make</h1>
+            <p className="subtitle" style={{ marginBottom: 0 }}>Admin dashboard · {tickets.length} ticket{tickets.length !== 1 ? 's' : ''}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => { setShowPwForm(f => !f); setPwError(null); setPwSuccess(false) }}>
+              {showPwForm ? 'Cancel' : 'Change password'}
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={handleLogout}>Sign out</button>
+          </div>
+        </div>
+
+        {showPwForm && (
+          <form onSubmit={handleChangePassword} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', padding: '12px 0', borderBottom: '1px solid var(--border)', marginBottom: 16 }}>
+            <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 160 }}>
+              <label style={{ fontSize: '0.8rem' }}>Current password</label>
+              <input type="password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} required />
+            </div>
+            <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 160 }}>
+              <label style={{ fontSize: '0.8rem' }}>New password</label>
+              <input type="password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} required />
+            </div>
+            <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 160 }}>
+              <label style={{ fontSize: '0.8rem' }}>Confirm new password</label>
+              <input type="password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} required />
+            </div>
+            <button type="submit" className="btn btn-primary btn-sm" disabled={pwSaving} style={{ marginBottom: 1 }}>
+              {pwSaving ? 'Saving…' : 'Update'}
+            </button>
+            {pwError && <p className="error" style={{ width: '100%', margin: 0 }}>{pwError}</p>}
+            {pwSuccess && <p style={{ width: '100%', margin: 0, color: 'green', fontSize: '0.875rem' }}>Password updated successfully.</p>}
+          </form>
+        )}
+
+        <div className="filters" style={{ marginBottom: 16 }}>
+          <select value={filters.app} onChange={e => setFilter('app', e.target.value)}>
+            <option value="">All apps</option>
+            {Object.entries(APP_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          <select value={filters.type} onChange={e => setFilter('type', e.target.value)}>
+            <option value="">All types</option>
+            <option>Bug</option>
+            <option>Enhancement</option>
+            <option>Question</option>
+          </select>
+          <select value={filters.status} onChange={e => setFilter('status', e.target.value)}>
+            <option value="">All statuses</option>
+            <option>Open</option>
+            <option value="In Progress">In Progress</option>
+            <option>Done</option>
+            <option value="Won't Fix">Won't Fix</option>
+          </select>
+          <button className="btn btn-secondary btn-sm" onClick={load}>Refresh</button>
+        </div>
+
+        {loading && <p className="loading">Loading tickets…</p>}
+        {error && <p className="error">{error}</p>}
+        {!loading && !error && (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>App</th>
+                  <th>Type</th>
+                  <th>Title</th>
+                  <SortHeader label="Urgency" field="submitter_urgency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader label="Priority" field="admin_priority" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader label="Date" field="created_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {tickets.length === 0 && (
+                  <tr><td colSpan={9} className="empty">No tickets match the current filters.</td></tr>
+                )}
+                {tickets.map(t => (
+                  <tr key={t.id} style={{ cursor: 'pointer' }}>
+                    <td onClick={() => openDetail(t)}><code style={{ fontSize: '0.8rem' }}>{displayId(t)}</code></td>
+                    <td onClick={() => openDetail(t)}>{APP_LABELS[t.app] || t.app}</td>
+                    <td onClick={() => openDetail(t)}>{t.type}</td>
+                    <td onClick={() => openDetail(t)} style={{ maxWidth: 260 }}>{t.title}</td>
+                    <td onClick={() => openDetail(t)}>
+                      <span className={`badge ${PRIORITY_BADGE[t.submitter_urgency] || ''}`}>{t.submitter_urgency}</span>
+                    </td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <select
+                        value={t.admin_priority || ''}
+                        onChange={e => handleInlineChange(t, 'admin_priority', e.target.value || null)}
+                      >
+                        <option value="">—</option>
+                        <option>Low</option>
+                        <option>Medium</option>
+                        <option>High</option>
+                        <option>Critical</option>
+                      </select>
+                    </td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <select
+                        value={t.status}
+                        onChange={e => handleInlineChange(t, 'status', e.target.value)}
+                      >
+                        <option>Open</option>
+                        <option value="In Progress">In Progress</option>
+                        <option>Done</option>
+                        <option value="Won't Fix">Won't Fix</option>
+                      </select>
+                    </td>
+                    <td onClick={() => openDetail(t)} style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>
+                      {new Date(t.created_at).toLocaleDateString()}
+                    </td>
+                    <td>
+                      <button className="btn btn-danger btn-sm" onClick={e => { e.stopPropagation(); handleDelete(t) }}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Detail drawer */}
+      {selected && editDraft && (
+        <div className="drawer-overlay" onClick={() => setSelected(null)}>
+          <div className="drawer" onClick={e => e.stopPropagation()}>
+            <div className="drawer-header">
+              <div>
+                <code style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{displayId(selected)}</code>
+                <h2 style={{ marginBottom: 0 }}>{selected.title}</h2>
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={() => setSelected(null)}>✕</button>
+            </div>
+
+            <div className="form-group">
+              <label>Title</label>
+              <input type="text" value={editDraft.title} onChange={e => setEditDraft(d => ({ ...d, title: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Type</label>
+              <select value={editDraft.type} onChange={e => setEditDraft(d => ({ ...d, type: e.target.value }))}>
+                <option>Bug</option>
+                <option>Enhancement</option>
+                <option>Question</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Description</label>
+              <textarea value={editDraft.description} onChange={e => setEditDraft(d => ({ ...d, description: e.target.value }))} style={{ minHeight: 140 }} />
+            </div>
+            <div className="form-group">
+              <label>Admin Priority</label>
+              <select value={editDraft.admin_priority || ''} onChange={e => setEditDraft(d => ({ ...d, admin_priority: e.target.value || null }))}>
+                <option value="">—</option>
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+                <option>Critical</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Status</label>
+              <select value={editDraft.status} onChange={e => setEditDraft(d => ({ ...d, status: e.target.value }))}>
+                <option>Open</option>
+                <option value="In Progress">In Progress</option>
+                <option>Done</option>
+                <option value="Won't Fix">Won't Fix</option>
+              </select>
+            </div>
+
+            <dl className="detail-grid" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+              <dt>App</dt><dd>{APP_LABELS[selected.app] || selected.app}</dd>
+              <dt>Submitter urgency</dt><dd>{selected.submitter_urgency}</dd>
+              <dt>Email</dt><dd>{selected.submitter_email || <span style={{ color: 'var(--text-muted)' }}>—</span>}</dd>
+              <dt>Created</dt><dd>{new Date(selected.created_at).toLocaleString()}</dd>
+              <dt>Updated</dt><dd>{new Date(selected.updated_at).toLocaleString()}</dd>
+            </dl>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 16 }}>
+              <button className="btn btn-primary" onClick={saveDetail} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
+              <button className="btn btn-secondary" onClick={() => setSelected(null)}>Cancel</button>
+              <button className="btn btn-danger btn-sm" style={{ marginLeft: 'auto' }} onClick={() => handleDelete(selected)}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

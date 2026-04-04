@@ -1,0 +1,155 @@
+# Could You Make — Requirements
+
+## Overview
+
+A standalone, private ticket management app for collecting bug reports and enhancement requests across all of Erik's personal and client apps. Named after the natural language pattern used when requesting changes ("Could you make...?").
+
+Deployed at [couldyoumake.app](https://couldyoumake.app) on Railway (FastAPI + PostgreSQL backend, React + Vite frontend).
+
+The submitter experience is intentionally minimal — users submit a ticket and optionally track its status via a private link. They cannot see anyone else's tickets. Erik is the sole administrator.
+
+---
+
+## Apps Served
+
+| App | Audience | Ticket Prefix |
+|-----|----------|---------------|
+| Life Folio | Josephson-Nichols household | `LF` |
+| Canopy | Erik only | `CAN` |
+| no-app (KNO Mgmt) | Kirkwood Neighbors Organization board | `KNO` |
+| Practice Profiles | CHOA / TCCN staff | `PP` |
+| delta-mqds | Erik only | `DLT` |
+| Sampras | Erik only | `SAM` |
+
+---
+
+## User Roles
+
+### Submitter (end user)
+- Accesses the submit form via a link/button in their app
+- Fills out and submits a ticket
+- Optionally provides their email to receive a confirmation with ticket ID and a private status link
+- Can look up the status of their specific ticket via the private link (not guessable)
+- Cannot see any other tickets
+
+### Administrator (Erik)
+- Accesses the admin dashboard at `/admin` (password-protected)
+- Sees all tickets across all apps
+- Can sort and filter by app, date, type, urgency, priority, and status
+- Can set priority and update status inline or via the detail drawer
+- Can change admin password from within the dashboard
+- Has full read/write/delete access to all tickets
+
+---
+
+## Ticket Data Model
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | Auto-increment | Display format is app-specific, e.g. `CAN-001`, `LF-002` |
+| `lookup_token` | String (64) | Random URL-safe token; used for public status URL — not guessable |
+| `app` | Enum | life-folio, canopy, kno, practice-profiles, delta-mqds, sampras |
+| `type` | Enum | Bug, Enhancement, Question |
+| `title` | String | Short summary, required |
+| `description` | Text | Full detail, required |
+| `submitter_urgency` | Enum | Low, Medium, High — set by submitter |
+| `admin_priority` | Enum | Low, Medium, High, Critical — set by Erik, null until triaged |
+| `status` | Enum | Open, In Progress, Done, Won't Fix — default Open |
+| `submitter_email` | String | Optional; used only for confirmation email |
+| `created_at` | Timestamp | Set on creation |
+| `updated_at` | Timestamp | Updated on any change |
+
+---
+
+## Submit Form (`/submit`)
+
+- URL parameter `app` pre-populates and locks the app field (e.g. `/submit?app=kno`)
+- Fields: Title, Description, Type, Urgency, Email (optional)
+- On submit:
+  - Ticket is created with an app-specific display ID (e.g. `KNO-007`) and a random `lookup_token`
+  - If email provided: confirmation email sent via Fastmail SMTP with ticket ID and a link to `/ticket/{lookup_token}`
+  - Submitter sees a confirmation screen with the display ID and a "Track status" link
+- No login required
+- Rate limited to 5 submissions per minute per IP
+
+---
+
+## Status Page (`/ticket/:token`)
+
+- Publicly accessible but not linked or indexed — only reachable via the `lookup_token` in the confirmation email or success screen
+- Token is random and non-guessable; sequential ticket IDs cannot be enumerated
+- Shows: ticket ID, title, type, app, date submitted, current status
+- Does not show: priority, description, admin notes, submitter email, or any other tickets
+- If token not found: generic not-found message
+
+---
+
+## Admin Dashboard (`/admin`)
+
+- Redirects to `/admin/login` if not authenticated
+- Login page includes a link back to the submit form
+- Password stored hashed (pbkdf2, 100k iterations) in the database; falls back to env var on first run
+- Session persisted via a secure HTTP-only cookie (7-day expiry); sessions stored in DB and survive restarts
+- Expired sessions are cleaned up on each login
+- **Ticket list view:**
+  - Columns: ID, App, Type, Title, Urgency (submitter), Priority (admin, inline), Status (inline), Date
+  - Sortable by: Date, Urgency, Priority, Status
+  - Filterable by: App, Type, Status
+  - Title column wraps (not truncated)
+- **Ticket detail drawer** (click any row):
+  - Full description
+  - All fields editable: title, type, description, priority, status
+  - Read-only metadata: app, submitter urgency, email, timestamps
+  - Save and Delete buttons
+- **Change password** (inline form in dashboard header):
+  - Requires current password, new password, confirmation
+  - Minimum 8 characters enforced both client- and server-side
+  - Persisted to DB; takes effect immediately
+
+---
+
+## Email (Fastmail SMTP)
+
+- Trigger: ticket submission where submitter provides an email address
+- From: Erik's Fastmail account
+- Content:
+  - Subject: `Your ticket CAN-007 has been submitted`
+  - Body: ticket display ID, title, type, app, urgency, and a link to `/ticket/{lookup_token}`
+- No status-change notification emails (v1)
+
+---
+
+## Entry Points in Each App
+
+Each app displays a small, unobtrusive link or icon (e.g. a speech bubble or wrench icon in the corner or menu bar) that opens `couldyoumake.app/submit?app=<appname>` in a new tab. For Sampras (native macOS), the link opens in the default browser.
+
+---
+
+## Tech Stack
+
+- **Backend**: Python / FastAPI, PostgreSQL, SQLAlchemy, slowapi (rate limiting)
+- **Frontend**: React 18, Vite, React Router
+- **Hosting**: Railway
+- **Email**: Fastmail SMTP (aiosmtplib)
+- **Domain**: couldyoumake.app
+
+---
+
+## Security
+
+- Admin password hashed with pbkdf2_hmac (sha256, 100k iterations) + random salt
+- Sessions stored in DB with expiry; not held in memory
+- Public ticket status URLs use random tokens, not guessable sequential IDs
+- Rate limiting on ticket submission (5/minute per IP)
+- Session cookie: httponly, secure, samesite=lax
+- Pydantic validation on all inputs; SQLAlchemy ORM (no SQL injection risk)
+
+---
+
+## Out of Scope (v1)
+
+- Status-change notification emails
+- Submitter accounts or login
+- Public-facing ticket boards or voting
+- Attachments or screenshots
+- Multiple admin users
