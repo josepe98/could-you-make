@@ -159,7 +159,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="page" style={{ alignItems: 'flex-start', paddingTop: 32 }}>
-      <div className="card card-wide" style={{ maxWidth: 1100 }}>
+      <div className="card card-wide" style={{ maxWidth: 1400 }}>
         <div className="admin-header">
           <div>
             <h1>Could You Make</h1>
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>App</th>
+                  <th style={{ minWidth: '10rem' }}>App</th>
                   <th>Type</th>
                   <th>Title</th>
                   <SortHeader label="Urgency" field="submitter_urgency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />

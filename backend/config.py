@@ -7,7 +7,6 @@ ENV_FILE = Path(__file__).parent / ".env"
 class Settings(BaseSettings):
     DATABASE_URL: str
     ADMIN_PASSWORD: str
-    SESSION_SECRET: str = "changeme-in-production"
     SMTP_HOST: str = "smtp.fastmail.com"
     SMTP_PORT: int = 465
     SMTP_USER: str = ""
