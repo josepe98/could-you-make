@@ -76,7 +76,7 @@ export default function Submit() {
     <div className="page">
       <div className="card">
         <h1>Could You Make…</h1>
-        <p className="subtitle">Submit a bug report, feature request, or question.</p>
+        <p className="subtitle">Found something that doesn't work? Or have a great idea for improvements? Fill out the details below and Erik will get right on it!</p>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
