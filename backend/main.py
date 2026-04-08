@@ -51,7 +51,7 @@ def _migrate_lookup_token():
 _seed_admin_password()
 _migrate_lookup_token()
 
-app = FastAPI(title="Could You Make", docs_url=None, redoc_url=None)
+app = FastAPI(title="Could You Make", docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -72,6 +72,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "connect-src 'self'; "
             "frame-ancestors 'none';"
         )
+        if not request.url.path.startswith("/assets"):
+            response.headers["Cache-Control"] = "no-store"
         return response
 
 
