@@ -55,6 +55,7 @@ The submitter experience is intentionally minimal — users submit a ticket and 
 | `submitter_urgency` | Enum | Low, Medium, High — set by submitter |
 | `admin_priority` | Enum | Low, Medium, High, Critical — set by Erik, null until triaged |
 | `status` | Enum | Open, In Progress, Done, Won't Fix — default Open |
+| `clarifying_notes` | Text | Optional admin-only notes for triage/context |
 | `submitter_email` | String | Optional; used only for confirmation email |
 | `created_at` | Timestamp | Set on creation |
 | `updated_at` | Timestamp | Updated on any change |
@@ -98,7 +99,7 @@ The submitter experience is intentionally minimal — users submit a ticket and 
   - Title column wraps (not truncated)
 - **Ticket detail drawer** (click any row):
   - Full description
-  - All fields editable: title, type, description, priority, status
+  - All fields editable: title, type, description, clarifying_notes, priority, status
   - Read-only metadata: app, submitter urgency, email, timestamps
   - Save and Delete buttons
 - **Change password** (inline form in dashboard header):
@@ -143,6 +144,9 @@ Each app displays a small, unobtrusive link or icon (e.g. a speech bubble or wre
 - Rate limiting on ticket submission (5/minute per IP)
 - Session cookie: httponly, secure, samesite=lax
 - Pydantic validation on all inputs; SQLAlchemy ORM (no SQL injection risk)
+- Security headers middleware on all responses: HSTS, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, Permissions-Policy, Content-Security-Policy
+- Cache-Control: no-store on all non-static-asset responses
+- API docs endpoints disabled (no /api/docs, /redoc, /openapi.json)
 
 ---
 
