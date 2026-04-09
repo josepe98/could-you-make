@@ -35,6 +35,7 @@ class TicketAdmin(BaseModel):
     admin_priority: Optional[Priority] = None
     status: Status
     submitter_email: Optional[str] = None
+    clarifying_notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -47,6 +48,7 @@ class TicketUpdate(BaseModel):
     type: Optional[TicketType] = None
     title: Optional[str] = None
     description: Optional[str] = None
+    clarifying_notes: Optional[str] = None
 
 
 class AdminLogin(BaseModel):

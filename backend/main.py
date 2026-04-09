@@ -48,8 +48,18 @@ def _migrate_lookup_token():
         db.close()
 
 
+def _migrate_clarifying_notes():
+    """Add clarifying_notes column if missing."""
+    with engine.connect() as conn:
+        conn.execute(text(
+            "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS clarifying_notes TEXT"
+        ))
+        conn.commit()
+
+
 _seed_admin_password()
 _migrate_lookup_token()
+_migrate_clarifying_notes()
 
 app = FastAPI(title="Could You Make", docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
