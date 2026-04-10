@@ -9,6 +9,7 @@ const APP_LABELS = {
   'practice-profiles': 'Practice Profiles',
   'delta-mqds': 'delta-mqds',
   'sampras': 'Sampras',
+  'proj-mgmt': 'Project Gantt',
 }
 
 const STATUS_BADGE = {

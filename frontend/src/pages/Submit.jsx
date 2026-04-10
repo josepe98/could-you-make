@@ -9,6 +9,7 @@ const APPS = [
   { value: 'practice-profiles', label: 'Practice Profiles' },
   { value: 'delta-mqds', label: 'delta-mqds' },
   { value: 'sampras', label: 'Sampras' },
+  { value: 'proj-mgmt', label: 'Project Gantt' },
 ]
 
 const APP_LABELS = Object.fromEntries(APPS.map(a => [a.value, a.label]))

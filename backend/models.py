@@ -12,6 +12,7 @@ APP_PREFIXES = {
     "practice-profiles": "PP",
     "delta-mqds": "DLT",
     "sampras": "SAM",
+    "proj-mgmt": "PM",
 }
 
 
@@ -22,6 +23,7 @@ class AppName(str, enum.Enum):
     practice_profiles = "practice-profiles"
     delta_mqds = "delta-mqds"
     sampras = "sampras"
+    proj_mgmt = "proj-mgmt"
 
 
 class TicketType(str, enum.Enum):
