@@ -29,14 +29,24 @@ def _seed_admin_password():
         db.close()
 
 
-def _migrate_lookup_token():
-    """Add lookup_token column if missing and backfill any NULL values."""
+def _run_ddl_migrations():
+    """Add any columns missing from older schemas. Must run before any ORM
+    queries, because SQLAlchemy SELECTs include every column on the model —
+    a missing column would crash the query and prevent later migrations from
+    running."""
     with engine.connect() as conn:
         conn.execute(text(
             "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS "
             "lookup_token VARCHAR(64) UNIQUE"
         ))
+        conn.execute(text(
+            "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS clarifying_notes TEXT"
+        ))
         conn.commit()
+
+
+def _backfill_lookup_tokens():
+    """Populate lookup_token for any rows created before the column existed."""
     db = SessionLocal()
     try:
         rows = db.query(Ticket).filter(Ticket.lookup_token == None).all()
@@ -48,18 +58,9 @@ def _migrate_lookup_token():
         db.close()
 
 
-def _migrate_clarifying_notes():
-    """Add clarifying_notes column if missing."""
-    with engine.connect() as conn:
-        conn.execute(text(
-            "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS clarifying_notes TEXT"
-        ))
-        conn.commit()
-
-
+_run_ddl_migrations()
 _seed_admin_password()
-_migrate_lookup_token()
-_migrate_clarifying_notes()
+_backfill_lookup_tokens()
 
 app = FastAPI(title="Could You Make", docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
