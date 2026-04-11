@@ -12,6 +12,11 @@ const APP_LABELS = {
   'proj-mgmt': 'Project Gantt',
 }
 
+// Temporarily hide the admin Priority column to give Title more room.
+// All infrastructure (model field, API, detail drawer) is intact — flip
+// this back to true to restore the column.
+const SHOW_PRIORITY_COLUMN = false
+
 const STATUS_BADGE = {
   'Open': 'badge-open',
   'In Progress': 'badge-in-progress',
@@ -185,22 +190,24 @@ export default function AdminDashboard() {
       <td onClick={() => openDetail(t)}><code style={{ fontSize: '0.8rem' }}>{displayId(t)}</code></td>
       <td onClick={() => openDetail(t)}>{APP_LABELS[t.app] || t.app}</td>
       <td onClick={() => openDetail(t)}>{t.type}</td>
-      <td onClick={() => openDetail(t)} style={{ maxWidth: 260 }}>{t.title}</td>
+      <td onClick={() => openDetail(t)}>{t.title}</td>
       <td onClick={() => openDetail(t)}>
         <span className={`badge ${PRIORITY_BADGE[t.submitter_urgency] || ''}`}>{t.submitter_urgency}</span>
       </td>
-      <td onClick={e => e.stopPropagation()}>
-        <select
-          value={t.admin_priority || ''}
-          onChange={e => handleInlineChange(t, 'admin_priority', e.target.value || null)}
-        >
-          <option value="">—</option>
-          <option>Low</option>
-          <option>Medium</option>
-          <option>High</option>
-          <option>Critical</option>
-        </select>
-      </td>
+      {SHOW_PRIORITY_COLUMN && (
+        <td onClick={e => e.stopPropagation()}>
+          <select
+            value={t.admin_priority || ''}
+            onChange={e => handleInlineChange(t, 'admin_priority', e.target.value || null)}
+          >
+            <option value="">—</option>
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+            <option>Critical</option>
+          </select>
+        </td>
+      )}
       <td onClick={e => e.stopPropagation()}>
         <select
           value={t.status}
@@ -231,7 +238,9 @@ export default function AdminDashboard() {
             <th>Type</th>
             <th>Title</th>
             <SortHeader label="Urgency" field="submitter_urgency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-            <SortHeader label="Priority" field="admin_priority" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            {SHOW_PRIORITY_COLUMN && (
+              <SortHeader label="Priority" field="admin_priority" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            )}
             <SortHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             <SortHeader label="Date" field="created_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             <th></th>
@@ -239,7 +248,7 @@ export default function AdminDashboard() {
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={9} className="empty">{emptyMessage}</td></tr>
+            <tr><td colSpan={SHOW_PRIORITY_COLUMN ? 9 : 8} className="empty">{emptyMessage}</td></tr>
           )}
           {rows.map(renderRow)}
         </tbody>
