@@ -31,12 +31,58 @@ const PRIORITY_BADGE = {
   'Critical': 'badge-critical',
 }
 
-function SortHeader({ label, field, sortBy, sortDir, onSort }) {
+// Resizable column widths (pixels). Defaults are tuned so the longest
+// label in each column ("Practice Profiles", "Enhancement", etc.) fits
+// without wrapping. Persisted per browser via localStorage.
+const DEFAULT_COL_WIDTHS = {
+  id: 88,
+  app: 144,
+  type: 112,
+  title: 380,
+  urgency: 96,
+  status: 132,
+  date: 100,
+  actions: 88,
+}
+const COL_WIDTH_STORAGE_KEY = 'cym.adminColWidths.v1'
+
+function loadColWidths() {
+  if (typeof window === 'undefined') return DEFAULT_COL_WIDTHS
+  try {
+    const raw = window.localStorage.getItem(COL_WIDTH_STORAGE_KEY)
+    if (!raw) return DEFAULT_COL_WIDTHS
+    return { ...DEFAULT_COL_WIDTHS, ...JSON.parse(raw) }
+  } catch {
+    return DEFAULT_COL_WIDTHS
+  }
+}
+
+function ResizeHandle({ onMouseDown }) {
+  return (
+    <span
+      onMouseDown={onMouseDown}
+      onClick={e => e.stopPropagation()}
+      title="Drag to resize"
+      style={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: 8,
+        cursor: 'col-resize',
+        userSelect: 'none',
+      }}
+    />
+  )
+}
+
+function SortHeader({ label, field, sortBy, sortDir, onSort, onResize }) {
   const active = sortBy === field
   const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
   return (
-    <th className="sortable" onClick={() => onSort(field)}>
+    <th className="sortable" style={{ position: 'relative' }} onClick={() => onSort(field)}>
       {label}{arrow}
+      {onResize && <ResizeHandle onMouseDown={onResize} />}
     </th>
   )
 }
@@ -53,6 +99,29 @@ export default function AdminDashboard() {
   const [filters, setFilters] = useState({ app: '', type: '', status: '' })
   const [sortBy, setSortBy] = useState('created_at')
   const [sortDir, setSortDir] = useState('desc')
+
+  const [colWidths, setColWidths] = useState(loadColWidths)
+  useEffect(() => {
+    try { window.localStorage.setItem(COL_WIDTH_STORAGE_KEY, JSON.stringify(colWidths)) } catch {}
+  }, [colWidths])
+  const startResize = useCallback((colId) => (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    const startWidth = colWidths[colId]
+    function onMove(ev) {
+      const next = Math.max(40, startWidth + (ev.clientX - startX))
+      setColWidths(w => ({ ...w, [colId]: next }))
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+    }
+    document.body.style.cursor = 'col-resize'
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [colWidths])
 
   const [showPwForm, setShowPwForm] = useState(false)
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
@@ -230,19 +299,30 @@ export default function AdminDashboard() {
 
   const renderTable = (rows, emptyMessage) => (
     <div className="table-wrap">
-      <table>
+      <table style={{ tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: colWidths.id }} />
+          <col style={{ width: colWidths.app }} />
+          <col style={{ width: colWidths.type }} />
+          <col style={{ width: colWidths.title }} />
+          <col style={{ width: colWidths.urgency }} />
+          {SHOW_PRIORITY_COLUMN && <col />}
+          <col style={{ width: colWidths.status }} />
+          <col style={{ width: colWidths.date }} />
+          <col style={{ width: colWidths.actions }} />
+        </colgroup>
         <thead>
           <tr>
-            <th style={{ width: '5.5rem' }}>ID</th>
-            <th style={{ width: '8rem' }}>App</th>
-            <th style={{ width: '7rem' }}>Type</th>
-            <th style={{ width: 'auto' }}>Title</th>
-            <SortHeader label="Urgency" field="submitter_urgency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <th style={{ position: 'relative' }}>ID<ResizeHandle onMouseDown={startResize('id')} /></th>
+            <th style={{ position: 'relative' }}>App<ResizeHandle onMouseDown={startResize('app')} /></th>
+            <th style={{ position: 'relative' }}>Type<ResizeHandle onMouseDown={startResize('type')} /></th>
+            <th style={{ position: 'relative' }}>Title<ResizeHandle onMouseDown={startResize('title')} /></th>
+            <SortHeader label="Urgency" field="submitter_urgency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} onResize={startResize('urgency')} />
             {SHOW_PRIORITY_COLUMN && (
               <SortHeader label="Priority" field="admin_priority" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             )}
-            <SortHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-            <SortHeader label="Date" field="created_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} onResize={startResize('status')} />
+            <SortHeader label="Date" field="created_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} onResize={startResize('date')} />
             <th></th>
           </tr>
         </thead>
