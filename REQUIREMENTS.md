@@ -72,7 +72,7 @@ The submitter experience is intentionally minimal — users submit a ticket and 
   - If email provided: confirmation email sent via Fastmail SMTP with ticket ID and a link to `/ticket/{lookup_token}`
   - Submitter sees a confirmation screen with the display ID and a "Track status" link
 - No login required
-- Rate limited to 5 submissions per minute per IP
+- Rate limited to 2 submissions per minute per IP (keyed on `CF-Connecting-IP` from Cloudflare, falling back to `X-Forwarded-For`)
 
 ---
 
@@ -143,7 +143,7 @@ Each app displays a small, unobtrusive link or icon (e.g. a speech bubble or wre
 - Admin password hashed with pbkdf2_hmac (sha256, 100k iterations) + random salt
 - Sessions stored in DB with expiry; not held in memory
 - Public ticket status URLs use random tokens, not guessable sequential IDs
-- Rate limiting on ticket submission (5/minute per IP)
+- Rate limiting (slowapi, in-memory): ticket creation 2/min/IP, ticket lookup 30/min/IP, admin login 10/min/IP. IP keyed on `CF-Connecting-IP` so users behind the Cloudflare proxy aren't grouped into one bucket.
 - Session cookie: httponly, secure, samesite=lax
 - Pydantic validation on all inputs; SQLAlchemy ORM (no SQL injection risk)
 - Security headers middleware on all responses: HSTS, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, Permissions-Policy, Content-Security-Policy

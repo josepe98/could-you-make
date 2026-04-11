@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/tickets", tags=["tickets"])
 
 
 @router.post("", response_model=TicketCreateResponse)
-@limiter.limit("5/minute")
+@limiter.limit("2/minute")
 async def create_ticket(request: Request, ticket_in: TicketCreate, db: Session = Depends(get_db)):
     ticket = Ticket(
         app=ticket_in.app,
@@ -46,7 +46,8 @@ async def create_ticket(request: Request, ticket_in: TicketCreate, db: Session =
 
 
 @router.get("/{lookup_token}", response_model=TicketPublic)
-def get_ticket(lookup_token: str, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+async def get_ticket(request: Request, lookup_token: str, db: Session = Depends(get_db)):
     ticket = db.query(Ticket).filter(Ticket.lookup_token == lookup_token).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")

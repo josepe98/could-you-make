@@ -9,6 +9,7 @@ from ..models import Ticket, AdminPassword, AdminSession
 from ..schemas import TicketAdmin, TicketUpdate, AdminLogin, ChangePassword
 from ..config import settings
 from ..auth import hash_password, verify_password
+from ..limiter import limiter
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -37,7 +38,8 @@ def _check_password(password: str, db: Session) -> bool:
 
 
 @router.post("/login")
-def login(creds: AdminLogin, response: Response, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, creds: AdminLogin, response: Response, db: Session = Depends(get_db)):
     if not _check_password(creds.password, db):
         raise HTTPException(status_code=401, detail="Invalid password")
     # Clean up expired sessions on each login
