@@ -20,6 +20,7 @@ The submitter experience is intentionally minimal — users submit a ticket and 
 | Practice Profiles | CHOA / TCCN staff | `PP` |
 | delta-mqds | Erik only | `DLT` |
 | Sampras | Erik only | `SAM` |
+| Project Gantt (proj-mgmt) | Erik only | `PM` |
 
 ---
 
@@ -48,7 +49,7 @@ The submitter experience is intentionally minimal — users submit a ticket and 
 |-------|------|-------|
 | `id` | Auto-increment | Display format is app-specific, e.g. `CAN-001`, `LF-002` |
 | `lookup_token` | String (64) | Random URL-safe token; used for public status URL — not guessable |
-| `app` | Enum | life-folio, canopy, kno, practice-profiles, delta-mqds, sampras |
+| `app` | Enum | life-folio, canopy, kno, practice-profiles, delta-mqds, sampras, proj-mgmt |
 | `type` | Enum | Bug, Enhancement, Question |
 | `title` | String | Short summary, required |
 | `description` | Text | Full detail, required |
@@ -93,6 +94,7 @@ The submitter experience is intentionally minimal — users submit a ticket and 
 - Session persisted via a secure HTTP-only cookie (7-day expiry); sessions stored in DB and survive restarts
 - Expired sessions are cleaned up on each login
 - **Ticket list view:**
+  - Split into two tables: **Active** (any status other than Done) on top, **Done** below. Rows animate between the two tables via the View Transitions API when status is toggled across the Done boundary.
   - Columns: ID, App, Type, Title, Urgency (submitter), Priority (admin, inline), Status (inline), Date
   - Sortable by: Date, Urgency, Priority, Status
   - Filterable by: App, Type, Status
