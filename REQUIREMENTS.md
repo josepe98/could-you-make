@@ -2,25 +2,21 @@
 
 ## Overview
 
-A standalone, private ticket management app for collecting bug reports and enhancement requests across all of Erik's personal and client apps. Named after the natural language pattern used when requesting changes ("Could you make...?").
+A self-hosted, single-tenant ticket management app for collecting bug reports and enhancement requests across multiple apps maintained by one developer or small team. Named after the natural language pattern used when requesting changes ("Could you make...?").
 
-Deployed at [couldyoumake.app](https://couldyoumake.app) on Railway (FastAPI + PostgreSQL backend, React + Vite frontend).
+Stack: FastAPI + PostgreSQL backend, React + Vite frontend, packaged as a single Docker container.
 
-The submitter experience is intentionally minimal — users submit a ticket and optionally track its status via a private link. They cannot see anyone else's tickets. Erik is the sole administrator.
+The submitter experience is intentionally minimal — users submit a ticket and optionally track its status via a private link. They cannot see anyone else's tickets. There is exactly one administrator account.
 
 ---
 
 ## Apps Served
 
-| App | Audience | Ticket Prefix |
-|-----|----------|---------------|
-| Life Folio | Josephson-Nichols household | `LF` |
-| Canopy | Erik only | `CAN` |
-| no-app (KNO Mgmt) | Kirkwood Neighbors Organization board | `KNO` |
-| Practice Profiles | CHOA / TCCN staff | `PP` |
-| delta-mqds | Erik only | `DLT` |
-| Sampras | Erik only | `SAM` |
-| Project Gantt (proj-mgmt) | Erik only | `PM` |
+The set of apps and their ticket-ID prefixes is configured in code (not in the database) — see `APP_PREFIXES` and the `AppName` enum in `backend/models.py`, plus the `APP_LABELS` constants in `frontend/src/pages/`. Each app gets:
+
+- A short slug used in the URL (e.g. `?app=blog`)
+- A 2-4 letter prefix that becomes part of every ticket's display ID (e.g. `BLOG-001`)
+- A human-readable label shown in the dashboard and submit form
 
 ---
 
@@ -33,8 +29,8 @@ The submitter experience is intentionally minimal — users submit a ticket and 
 - Can look up the status of their specific ticket via the private link (not guessable)
 - Cannot see any other tickets
 
-### Administrator (Erik)
-- Accesses the admin dashboard at `/admin` (password-protected)
+### Administrator
+- Accesses the admin dashboard at `/admin` (password-protected). There is exactly one admin account per instance.
 - Sees all tickets across all apps
 - Can sort and filter by app, date, type, urgency, priority, and status
 - Can set priority and update status inline or via the detail drawer
@@ -47,14 +43,14 @@ The submitter experience is intentionally minimal — users submit a ticket and 
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `id` | Auto-increment | Display format is app-specific, e.g. `CAN-001`, `LF-002` |
+| `id` | Auto-increment | Display format is app-specific, e.g. `BLOG-001`, `STORE-014` |
 | `lookup_token` | String (64) | Random URL-safe token; used for public status URL — not guessable |
-| `app` | Enum | life-folio, canopy, kno, practice-profiles, delta-mqds, sampras, proj-mgmt |
+| `app` | Enum | Configured per instance via `AppName` in `backend/models.py` |
 | `type` | Enum | Bug, Enhancement, Question |
 | `title` | String | Short summary, required |
 | `description` | Text | Full detail, required |
 | `submitter_urgency` | Enum | Low, Medium, High — set by submitter |
-| `admin_priority` | Enum | Low, Medium, High, Critical — set by Erik, null until triaged |
+| `admin_priority` | Enum | Low, Medium, High, Critical — set by admin, null until triaged |
 | `status` | Enum | Open, In Progress, Done, Won't Fix — default Open |
 | `clarifying_notes` | Text | Optional admin-only notes for triage/context |
 | `submitter_email` | String | Optional; used only for confirmation email |
@@ -65,14 +61,14 @@ The submitter experience is intentionally minimal — users submit a ticket and 
 
 ## Submit Form (`/submit`)
 
-- URL parameter `app` pre-populates and locks the app field (e.g. `/submit?app=kno`)
+- URL parameter `app` pre-populates and locks the app field (e.g. `/submit?app=blog`)
 - Fields: Title, Description, Type, Urgency, Email (optional)
 - On submit:
-  - Ticket is created with an app-specific display ID (e.g. `KNO-007`) and a random `lookup_token`
-  - If email provided: confirmation email sent via Fastmail SMTP with ticket ID and a link to `/ticket/{lookup_token}`
+  - Ticket is created with an app-specific display ID (e.g. `BLOG-007`) and a random `lookup_token`
+  - If email provided: confirmation email sent via SMTP with ticket ID and a link to `/ticket/{lookup_token}`
   - Submitter sees a confirmation screen with the display ID and a "Track status" link
 - No login required
-- Rate limited to 2 submissions per minute per IP (keyed on `CF-Connecting-IP` from Cloudflare, falling back to `X-Forwarded-For`)
+- Rate limited to 2 submissions per minute per IP. The IP is keyed on `CF-Connecting-IP` (Cloudflare), falling back to `X-Forwarded-For`, then to the connection IP — see `backend/limiter.py` and the README's "Behind a reverse proxy / CDN" section for the trust model.
 
 ---
 
@@ -111,12 +107,12 @@ The submitter experience is intentionally minimal — users submit a ticket and 
 
 ---
 
-## Email (Fastmail SMTP)
+## Email (SMTP)
 
 - Trigger: ticket submission where submitter provides an email address
-- From: Erik's Fastmail account
+- Configured via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `FROM_EMAIL` env vars (any provider)
 - Content:
-  - Subject: `Your ticket CAN-007 has been submitted`
+  - Subject: `Your ticket BLOG-007 has been submitted`
   - Body: ticket display ID, title, type, app, urgency, and a link to `/ticket/{lookup_token}`
 - No status-change notification emails (v1)
 
@@ -124,7 +120,7 @@ The submitter experience is intentionally minimal — users submit a ticket and 
 
 ## Entry Points in Each App
 
-Each app displays a small, unobtrusive link or icon (e.g. a speech bubble or wrench icon in the corner or menu bar) that opens `couldyoumake.app/submit?app=<appname>` in a new tab. For Sampras (native macOS), the link opens in the default browser.
+Each integrating app displays a small, unobtrusive link or icon (e.g. a speech bubble or wrench icon in the corner or menu bar) that opens `<your-instance>/submit?app=<appname>` in a new tab. Native apps can open the same URL in the system default browser.
 
 ---
 
@@ -132,9 +128,8 @@ Each app displays a small, unobtrusive link or icon (e.g. a speech bubble or wre
 
 - **Backend**: Python / FastAPI, PostgreSQL, SQLAlchemy, slowapi (rate limiting)
 - **Frontend**: React 18, Vite, React Router
-- **Hosting**: Railway
-- **Email**: Fastmail SMTP (aiosmtplib)
-- **Domain**: couldyoumake.app
+- **Email**: SMTP via aiosmtplib (provider-agnostic)
+- **Packaging**: multi-stage Dockerfile (single container serves API + built frontend)
 
 ---
 
