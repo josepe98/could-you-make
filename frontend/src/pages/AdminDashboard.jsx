@@ -83,8 +83,24 @@ export default function AdminDashboard() {
   async function handleInlineChange(ticket, field, value) {
     try {
       const updated = await updateTicket(ticket.id, { [field]: value })
-      setTickets(ts => ts.map(t => t.id === updated.id ? updated : t))
-      if (selected?.id === updated.id) setSelected(updated)
+      const apply = () => {
+        setTickets(ts => ts.map(t => t.id === updated.id ? updated : t))
+        if (selected?.id === updated.id) setSelected(updated)
+      }
+      // Animate row sliding between the open and done tables when status
+      // crosses the Done boundary, using the View Transitions API.
+      const crossed =
+        field === 'status' &&
+        (ticket.status === 'Done') !== (updated.status === 'Done') &&
+        typeof document !== 'undefined' &&
+        typeof document.startViewTransition === 'function'
+      if (crossed) {
+        document.startViewTransition(() => {
+          apply()
+        })
+      } else {
+        apply()
+      }
     } catch (e) {
       alert('Failed to update: ' + e.message)
     }
@@ -158,6 +174,79 @@ export default function AdminDashboard() {
 
   const displayId = t => t.display_id || `CYM-${String(t.id).padStart(3, '0')}`
 
+  const openTickets = tickets.filter(t => t.status !== 'Done')
+  const doneTickets = tickets.filter(t => t.status === 'Done')
+
+  const renderRow = (t) => (
+    <tr
+      key={t.id}
+      style={{ cursor: 'pointer', viewTransitionName: `ticket-row-${t.id}` }}
+    >
+      <td onClick={() => openDetail(t)}><code style={{ fontSize: '0.8rem' }}>{displayId(t)}</code></td>
+      <td onClick={() => openDetail(t)}>{APP_LABELS[t.app] || t.app}</td>
+      <td onClick={() => openDetail(t)}>{t.type}</td>
+      <td onClick={() => openDetail(t)} style={{ maxWidth: 260 }}>{t.title}</td>
+      <td onClick={() => openDetail(t)}>
+        <span className={`badge ${PRIORITY_BADGE[t.submitter_urgency] || ''}`}>{t.submitter_urgency}</span>
+      </td>
+      <td onClick={e => e.stopPropagation()}>
+        <select
+          value={t.admin_priority || ''}
+          onChange={e => handleInlineChange(t, 'admin_priority', e.target.value || null)}
+        >
+          <option value="">—</option>
+          <option>Low</option>
+          <option>Medium</option>
+          <option>High</option>
+          <option>Critical</option>
+        </select>
+      </td>
+      <td onClick={e => e.stopPropagation()}>
+        <select
+          value={t.status}
+          onChange={e => handleInlineChange(t, 'status', e.target.value)}
+        >
+          <option>Open</option>
+          <option value="In Progress">In Progress</option>
+          <option>Done</option>
+          <option value="Won't Fix">Won't Fix</option>
+        </select>
+      </td>
+      <td onClick={() => openDetail(t)} style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>
+        {new Date(t.created_at).toLocaleDateString()}
+      </td>
+      <td>
+        <button className="btn btn-danger btn-sm" onClick={e => { e.stopPropagation(); handleDelete(t) }}>Delete</button>
+      </td>
+    </tr>
+  )
+
+  const renderTable = (rows, emptyMessage) => (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th style={{ minWidth: '10rem' }}>App</th>
+            <th>Type</th>
+            <th>Title</th>
+            <SortHeader label="Urgency" field="submitter_urgency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortHeader label="Priority" field="admin_priority" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortHeader label="Date" field="created_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && (
+            <tr><td colSpan={9} className="empty">{emptyMessage}</td></tr>
+          )}
+          {rows.map(renderRow)}
+        </tbody>
+      </table>
+    </div>
+  )
+
   return (
     <div className="page" style={{ alignItems: 'flex-start', paddingTop: 32 }}>
       <div className="card card-wide" style={{ maxWidth: 1400 }}>
@@ -220,68 +309,16 @@ export default function AdminDashboard() {
         {loading && <p className="loading">Loading tickets…</p>}
         {error && <p className="error">{error}</p>}
         {!loading && !error && (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th style={{ minWidth: '10rem' }}>App</th>
-                  <th>Type</th>
-                  <th>Title</th>
-                  <SortHeader label="Urgency" field="submitter_urgency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                  <SortHeader label="Priority" field="admin_priority" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                  <SortHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                  <SortHeader label="Date" field="created_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {tickets.length === 0 && (
-                  <tr><td colSpan={9} className="empty">No tickets match the current filters.</td></tr>
-                )}
-                {tickets.map(t => (
-                  <tr key={t.id} style={{ cursor: 'pointer' }}>
-                    <td onClick={() => openDetail(t)}><code style={{ fontSize: '0.8rem' }}>{displayId(t)}</code></td>
-                    <td onClick={() => openDetail(t)}>{APP_LABELS[t.app] || t.app}</td>
-                    <td onClick={() => openDetail(t)}>{t.type}</td>
-                    <td onClick={() => openDetail(t)} style={{ maxWidth: 260 }}>{t.title}</td>
-                    <td onClick={() => openDetail(t)}>
-                      <span className={`badge ${PRIORITY_BADGE[t.submitter_urgency] || ''}`}>{t.submitter_urgency}</span>
-                    </td>
-                    <td onClick={e => e.stopPropagation()}>
-                      <select
-                        value={t.admin_priority || ''}
-                        onChange={e => handleInlineChange(t, 'admin_priority', e.target.value || null)}
-                      >
-                        <option value="">—</option>
-                        <option>Low</option>
-                        <option>Medium</option>
-                        <option>High</option>
-                        <option>Critical</option>
-                      </select>
-                    </td>
-                    <td onClick={e => e.stopPropagation()}>
-                      <select
-                        value={t.status}
-                        onChange={e => handleInlineChange(t, 'status', e.target.value)}
-                      >
-                        <option>Open</option>
-                        <option value="In Progress">In Progress</option>
-                        <option>Done</option>
-                        <option value="Won't Fix">Won't Fix</option>
-                      </select>
-                    </td>
-                    <td onClick={() => openDetail(t)} style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>
-                      {new Date(t.created_at).toLocaleDateString()}
-                    </td>
-                    <td>
-                      <button className="btn btn-danger btn-sm" onClick={e => { e.stopPropagation(); handleDelete(t) }}>Delete</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <h2 style={{ fontSize: '1rem', marginTop: 0, marginBottom: 8, color: 'var(--text-muted)' }}>
+              Active · {openTickets.length}
+            </h2>
+            {renderTable(openTickets, 'No active tickets match the current filters.')}
+            <h2 style={{ fontSize: '1rem', marginTop: 24, marginBottom: 8, color: 'var(--text-muted)' }}>
+              Done · {doneTickets.length}
+            </h2>
+            {renderTable(doneTickets, 'No completed tickets.')}
+          </>
         )}
       </div>
 

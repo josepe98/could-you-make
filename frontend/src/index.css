@@ -152,6 +152,25 @@ input[disabled], select[disabled] {
 
 .table-wrap { overflow-x: auto; }
 
+/* Slide animation when a ticket row moves between the Active and Done
+ * tables. Driven by the View Transitions API — each row gets a unique
+ * view-transition-name, and the browser animates old→new positions. */
+@keyframes ticket-row-in {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ticket-row-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(12px); }
+}
+/* Apply the slide to every named snapshot (wildcard covers all ticket rows). */
+::view-transition-old(*) { animation: ticket-row-out 320ms ease both; }
+::view-transition-new(*) { animation: ticket-row-in 320ms ease both; }
+/* Suppress the default full-page cross-fade so only the rows animate.
+ * Named pseudo-elements are more specific than the wildcard, so this wins. */
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; }
+
 table {
   width: 100%;
   border-collapse: collapse;
