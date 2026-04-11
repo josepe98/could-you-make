@@ -233,10 +233,10 @@ export default function AdminDashboard() {
       <table>
         <thead>
           <tr>
-            <th>ID</th>
-            <th style={{ minWidth: '10rem' }}>App</th>
-            <th>Type</th>
-            <th>Title</th>
+            <th style={{ width: '5.5rem' }}>ID</th>
+            <th style={{ width: '8rem' }}>App</th>
+            <th style={{ width: '7rem' }}>Type</th>
+            <th style={{ width: 'auto' }}>Title</th>
             <SortHeader label="Urgency" field="submitter_urgency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             {SHOW_PRIORITY_COLUMN && (
               <SortHeader label="Priority" field="admin_priority" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
