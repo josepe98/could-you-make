@@ -30,7 +30,7 @@ export default function TicketStatus() {
       .then(setTicket)
       .catch(() => setError('Ticket not found.'))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [token])
 
   return (
     <div className="page">
