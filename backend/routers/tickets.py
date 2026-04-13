@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from ..database import get_db
@@ -6,6 +7,7 @@ from ..schemas import TicketCreate, TicketPublic, TicketCreateResponse
 from ..email_utils import send_confirmation_email
 from ..limiter import limiter
 
+log = logging.getLogger("cym.tickets")
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
 
 
@@ -15,7 +17,7 @@ async def _send_confirmation_safe(**kwargs):
     try:
         await send_confirmation_email(**kwargs)
     except Exception as e:
-        print(f"[email] Failed to send confirmation: {e}")
+        log.error("Failed to send confirmation email: %s", e, exc_info=True)
 
 
 @router.post("", response_model=TicketCreateResponse)

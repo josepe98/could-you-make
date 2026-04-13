@@ -1,7 +1,16 @@
+import logging
 import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from .config import settings
+
+log = logging.getLogger("cym.email")
+
+# Seconds to wait for each stage of the SMTP conversation.  Fastmail
+# on port 465 (implicit TLS) typically responds in <2s; if Railway or
+# the network is blocking the port, we'll find out quickly rather than
+# hanging for 60s (the aiosmtplib default).
+SMTP_TIMEOUT = 15
 
 
 async def send_confirmation_email(
@@ -14,7 +23,7 @@ async def send_confirmation_email(
     urgency: str,
 ):
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        print(f"[email] Skipping — SMTP not configured. Would have sent to {to_email}")
+        log.warning("SMTP not configured — skipping email to %s", to_email)
         return
 
     ticket_url = f"{settings.BASE_URL}/ticket/{lookup_token}"
@@ -57,6 +66,8 @@ Thanks for the feedback!
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
+    log.info("Sending confirmation for %s to %s via %s:%s",
+             display_id, to_email, settings.SMTP_HOST, settings.SMTP_PORT)
     await aiosmtplib.send(
         msg,
         hostname=settings.SMTP_HOST,
@@ -64,4 +75,6 @@ Thanks for the feedback!
         username=settings.SMTP_USER,
         password=settings.SMTP_PASSWORD,
         use_tls=True,
+        timeout=SMTP_TIMEOUT,
     )
+    log.info("Confirmation sent for %s", display_id)
