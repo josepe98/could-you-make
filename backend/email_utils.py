@@ -68,13 +68,16 @@ Thanks for the feedback!
 
     log.info("Sending confirmation for %s to %s via %s:%s",
              display_id, to_email, settings.SMTP_HOST, settings.SMTP_PORT)
+    # Port 587 + STARTTLS rather than 465 + implicit TLS, because
+    # Railway (and most PaaS providers) block outbound 465 to deter
+    # spam. 587 is typically allowed.
     await aiosmtplib.send(
         msg,
         hostname=settings.SMTP_HOST,
         port=settings.SMTP_PORT,
         username=settings.SMTP_USER,
         password=settings.SMTP_PASSWORD,
-        use_tls=True,
+        start_tls=True,
         timeout=SMTP_TIMEOUT,
     )
     log.info("Confirmation sent for %s", display_id)
