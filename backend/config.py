@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     FROM_EMAIL: str = ""
+    REPLY_TO: str = ""
     BASE_URL: str = "https://couldyoumake.app"
 
     model_config = {"env_file": str(ENV_FILE)}

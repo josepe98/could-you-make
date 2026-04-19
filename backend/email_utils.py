@@ -32,6 +32,8 @@ async def send_confirmation_email(
     msg["Subject"] = f"Your ticket {display_id} has been submitted"
     msg["From"] = settings.FROM_EMAIL
     msg["To"] = to_email
+    if settings.REPLY_TO:
+        msg["Reply-To"] = settings.REPLY_TO
 
     text_body = f"""Hi,
 
