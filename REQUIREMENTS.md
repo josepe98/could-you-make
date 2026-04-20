@@ -91,7 +91,8 @@ The set of apps and their ticket-ID prefixes is configured in code (not in the d
 - Expired sessions are cleaned up on each login
 - **Ticket list view:**
   - Split into two tables: **Active** (any status other than Done) on top, **Done** below. Rows animate between the two tables via the View Transitions API when status is toggled across the Done boundary.
-  - Columns: ID, App, Type, Title, Urgency (submitter), Priority (admin, inline), Status (inline), Date
+  - Columns: ID, App, Type, Title, Urgency (submitter), Priority (admin, inline — currently hidden via `SHOW_PRIORITY_COLUMN` flag in `AdminDashboard.jsx`), Status (inline), Date
+  - Column widths are user-resizable (drag the column edge); widths persist per browser via `localStorage`
   - Sortable by: Date, Urgency, Priority, Status
   - Filterable by: App, Type, Status
   - Title column wraps (not truncated)
@@ -110,7 +111,9 @@ The set of apps and their ticket-ID prefixes is configured in code (not in the d
 ## Email (SMTP)
 
 - Trigger: ticket submission where submitter provides an email address
-- Configured via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `FROM_EMAIL` env vars (any provider)
+- Configured via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `FROM_EMAIL` env vars (any provider). Optional `REPLY_TO` sets the Reply-To header.
+- Recommended: port 587 + STARTTLS. Most PaaS providers (Railway, Render, Fly) block outbound port 465; port 587 is typically allowed.
+- Email is sent as a FastAPI `BackgroundTask` so the HTTP response returns immediately.
 - Content:
   - Subject: `Your ticket BLOG-007 has been submitted`
   - Body: ticket display ID, title, type, app, urgency, and a link to `/ticket/{lookup_token}`
