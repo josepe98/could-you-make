@@ -54,8 +54,10 @@ export DATABASE_URL="postgresql://user:pass@localhost/cym"
 export ADMIN_PASSWORD="change-me-on-first-login"
 
 # Optional — only needed if you want confirmation emails:
-export SMTP_HOST=smtp.example.com SMTP_PORT=465
+export SMTP_HOST=smtp.example.com SMTP_PORT=587
 export SMTP_USER=... SMTP_PASSWORD=... FROM_EMAIL=...
+# Optional: set Reply-To to a different address than FROM_EMAIL
+# export REPLY_TO=support@example.com
 
 uvicorn backend.main:app --reload --port 8001
 ```
@@ -87,7 +89,8 @@ Required runtime env vars:
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `ADMIN_PASSWORD` | Bootstrap password for first login. Change immediately. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `FROM_EMAIL` | Optional, for confirmation emails |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `FROM_EMAIL` | Optional, for confirmation emails. Recommended: port 587 + STARTTLS (port 465 is blocked by most PaaS providers). |
+| `REPLY_TO` | Optional. Sets Reply-To on confirmation emails, e.g. a support alias. |
 | `BASE_URL` | Public URL of your instance (used in confirmation email links). Defaults to the production URL. |
 
 Schema changes are applied at startup via `_run_ddl_migrations()` in `backend/main.py` using `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. There is no Alembic — when you add a new model column, also add a matching `ALTER TABLE` line in that function.
