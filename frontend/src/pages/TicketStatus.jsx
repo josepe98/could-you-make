@@ -17,6 +17,8 @@ const APP_LABELS = {
   'delta-mqds': 'delta-mqds',
   'sampras': 'Sampras',
   'proj-mgmt': 'Project Gantt',
+  'admin': 'Admin',
+  'cym': 'Could You Make',
 }
 
 export default function TicketStatus() {

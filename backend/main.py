@@ -42,6 +42,8 @@ def _run_ddl_migrations():
         conn.execute(text(
             "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS clarifying_notes TEXT"
         ))
+        conn.execute(text("ALTER TYPE appname ADD VALUE IF NOT EXISTS 'admin'"))
+        conn.execute(text("ALTER TYPE appname ADD VALUE IF NOT EXISTS 'cym'"))
         conn.commit()
 
 

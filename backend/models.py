@@ -13,6 +13,8 @@ APP_PREFIXES = {
     "delta-mqds": "DLT",
     "sampras": "SAM",
     "proj-mgmt": "PM",
+    "admin": "ADM",
+    "cym": "CYM",
 }
 
 # Human-readable app names. Used anywhere we display an app to a person
@@ -27,6 +29,8 @@ APP_LABELS = {
     "delta-mqds": "delta-mqds",
     "sampras": "Sampras",
     "proj-mgmt": "Project Gantt",
+    "admin": "Admin",
+    "cym": "Could You Make",
 }
 
 
@@ -38,6 +42,8 @@ class AppName(str, enum.Enum):
     delta_mqds = "delta-mqds"
     sampras = "sampras"
     proj_mgmt = "proj-mgmt"
+    admin = "admin"
+    cym = "cym"
 
 
 class TicketType(str, enum.Enum):
@@ -103,7 +109,7 @@ class Ticket(Base):
 
     @property
     def display_id(self) -> str:
-        prefix = APP_PREFIXES.get(self.app, "CYM")
+        prefix = APP_PREFIXES[self.app]
         return f"{prefix}-{self.id:03d}"
 
 

@@ -10,6 +10,8 @@ const APP_LABELS = {
   'delta-mqds': 'delta-mqds',
   'sampras': 'Sampras',
   'proj-mgmt': 'Project Gantt',
+  'admin': 'Admin',
+  'cym': 'Could You Make',
 }
 
 // Temporarily hide the admin Priority column to give Title more room.
