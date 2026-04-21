@@ -13,15 +13,8 @@ class Settings(BaseSettings):
     REPLY_TO: str = ""
     BASE_URL: str = "https://couldyoumake.app"
 
-    # Legacy SMTP settings — kept here so existing .env / Railway vars
-    # don't cause a ValidationError during the Resend rollout. No longer
-    # read by the code. Safe to delete these env vars, and this block,
-    # once the migration is confirmed working in production.
-    SMTP_HOST: str = ""
-    SMTP_PORT: int = 0
-    SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
-
+    # extra=ignore so stray env vars (old SMTP_*, etc.) don't raise
+    # ValidationError on startup.
     model_config = {"env_file": str(ENV_FILE), "extra": "ignore"}
 
 
