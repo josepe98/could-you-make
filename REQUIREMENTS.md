@@ -65,7 +65,7 @@ The set of apps and their ticket-ID prefixes is configured in code (not in the d
 - Fields: Title, Description, Type, Urgency, Email (optional)
 - On submit:
   - Ticket is created with an app-specific display ID (e.g. `BLOG-007`) and a random `lookup_token`
-  - If email provided: confirmation email sent via SMTP with ticket ID and a link to `/ticket/{lookup_token}`
+  - If email provided: confirmation email sent via Resend with ticket ID and a link to `/ticket/{lookup_token}`
   - Submitter sees a confirmation screen with the display ID and a "Track status" link
 - No login required
 - Rate limited to 2 submissions per minute per IP. The IP is keyed on `CF-Connecting-IP` (Cloudflare), falling back to `X-Forwarded-For`, then to the connection IP — see `backend/limiter.py` and the README's "Behind a reverse proxy / CDN" section for the trust model.
@@ -108,12 +108,13 @@ The set of apps and their ticket-ID prefixes is configured in code (not in the d
 
 ---
 
-## Email (SMTP)
+## Email (Resend HTTPS API)
 
 - Trigger: ticket submission where submitter provides an email address
-- Configured via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `FROM_EMAIL` env vars (any provider). Optional `REPLY_TO` sets the Reply-To header.
-- Recommended: port 587 + STARTTLS. Most PaaS providers (Railway, Render, Fly) block outbound port 465; port 587 is typically allowed.
-- Email is sent as a FastAPI `BackgroundTask` so the HTTP response returns immediately.
+- Configured via `RESEND_API_KEY` and `FROM_EMAIL` env vars. Optional `REPLY_TO` sets the Reply-To header.
+- Uses Resend's HTTPS API rather than SMTP, because most PaaS providers (notably Railway) block outbound SMTP on every port. HTTPS always works.
+- Sent as a FastAPI `BackgroundTask` so the HTTP response returns immediately, with a 15-second timeout.
+- `FROM_EMAIL` must be on a domain verified in Resend; the address itself does not need to be a real mailbox.
 - Content:
   - Subject: `Your ticket BLOG-007 has been submitted`
   - Body: ticket display ID, title, type, app, urgency, and a link to `/ticket/{lookup_token}`
@@ -131,7 +132,7 @@ Each integrating app displays a small, unobtrusive link or icon (e.g. a speech b
 
 - **Backend**: Python / FastAPI, PostgreSQL, SQLAlchemy, slowapi (rate limiting)
 - **Frontend**: React 18, Vite, React Router
-- **Email**: SMTP via aiosmtplib (provider-agnostic)
+- **Email**: Resend HTTPS API (via the `resend` Python SDK)
 - **Packaging**: multi-stage Dockerfile (single container serves API + built frontend)
 
 ---

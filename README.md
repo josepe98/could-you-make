@@ -27,7 +27,7 @@ The full spec lives in [`REQUIREMENTS.md`](./REQUIREMENTS.md).
 
 - **Backend**: Python 3.12 / FastAPI / SQLAlchemy / PostgreSQL
   - slowapi for rate limiting
-  - aiosmtplib for confirmation emails (any SMTP provider)
+  - Resend HTTPS API for confirmation emails (any host that allows outbound HTTPS — including PaaS that block outbound SMTP)
 - **Frontend**: React 18 / Vite / React Router
 - **Build / deploy**: multi-stage Dockerfile (Node builds the frontend, Python slim serves the FastAPI app + built bundle from a single container)
 
@@ -54,10 +54,10 @@ export DATABASE_URL="postgresql://user:pass@localhost/cym"
 export ADMIN_PASSWORD="change-me-on-first-login"
 
 # Optional — only needed if you want confirmation emails:
-export SMTP_HOST=smtp.example.com SMTP_PORT=587
-export SMTP_USER=... SMTP_PASSWORD=... FROM_EMAIL=...
-# Optional: set Reply-To to a different address than FROM_EMAIL
-# export REPLY_TO=support@example.com
+export RESEND_API_KEY=re_...
+export FROM_EMAIL=tickets@your-verified-domain.com
+# Optional: set Reply-To to an inbox you actually read
+# export REPLY_TO=you@example.com
 
 uvicorn backend.main:app --reload --port 8001
 ```
@@ -89,8 +89,9 @@ Required runtime env vars:
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `ADMIN_PASSWORD` | Bootstrap password for first login. Change immediately. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `FROM_EMAIL` | Optional, for confirmation emails. Recommended: port 587 + STARTTLS (port 465 is blocked by most PaaS providers). |
-| `REPLY_TO` | Optional. Sets Reply-To on confirmation emails, e.g. a support alias. |
+| `RESEND_API_KEY` | Optional, for confirmation emails. Sign up at [resend.com](https://resend.com), verify your sending domain, create an API key. |
+| `FROM_EMAIL` | Required if emails are enabled. Must be on a domain you've verified in Resend (e.g. `tickets@yourdomain.com`). |
+| `REPLY_TO` | Optional. Sets Reply-To on confirmation emails, e.g. an inbox you actually read. |
 | `BASE_URL` | Public URL of your instance (used in confirmation email links). Defaults to the production URL. |
 
 Schema changes are applied at startup via `_run_ddl_migrations()` in `backend/main.py` using `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. There is no Alembic — when you add a new model column, also add a matching `ALTER TABLE` line in that function.
