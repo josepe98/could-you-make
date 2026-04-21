@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str
     RESEND_API_KEY: str = ""
     FROM_EMAIL: str = ""
+    FROM_NAME: str = ""
     REPLY_TO: str = ""
     BASE_URL: str = "https://couldyoumake.app"
 

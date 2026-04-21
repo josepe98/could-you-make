@@ -15,6 +15,20 @@ APP_PREFIXES = {
     "proj-mgmt": "PM",
 }
 
+# Human-readable app names. Used anywhere we display an app to a person
+# (confirmation emails, future admin exports, etc.). The frontend keeps
+# its own copy of this in the APP_LABELS constants on each page — keep
+# the two in sync.
+APP_LABELS = {
+    "life-folio": "Life Folio",
+    "canopy": "Canopy",
+    "kno": "KNO Mgmt",
+    "practice-profiles": "Practice Profiles",
+    "delta-mqds": "delta-mqds",
+    "sampras": "Sampras",
+    "proj-mgmt": "Project Gantt",
+}
+
 
 class AppName(str, enum.Enum):
     life_folio = "life-folio"

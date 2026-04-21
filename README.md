@@ -91,6 +91,7 @@ Required runtime env vars:
 | `ADMIN_PASSWORD` | Bootstrap password for first login. Change immediately. |
 | `RESEND_API_KEY` | Optional, for confirmation emails. Sign up at [resend.com](https://resend.com), verify your sending domain, create an API key. |
 | `FROM_EMAIL` | Required if emails are enabled. Must be on a domain you've verified in Resend (e.g. `tickets@yourdomain.com`). |
+| `FROM_NAME` | Optional. Display name shown in the From field (e.g. `Could You Make`). If unset, the bare address is used. |
 | `REPLY_TO` | Optional. Sets Reply-To on confirmation emails, e.g. an inbox you actually read. |
 | `BASE_URL` | Public URL of your instance (used in confirmation email links). Defaults to the production URL. |
 
