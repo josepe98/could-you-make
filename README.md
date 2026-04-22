@@ -100,8 +100,40 @@ Required runtime env vars:
 | `FROM_NAME` | Optional. Display name shown in the From field (e.g. `Could You Make`). If unset, the bare address is used. |
 | `REPLY_TO` | Optional. Sets Reply-To on confirmation emails, e.g. an inbox you actually read. |
 | `BASE_URL` | Public URL of your instance (used in confirmation email links). Defaults to the production URL. |
+| `API_KEY` | Optional. When set, admin endpoints accept `Authorization: Bearer <key>` in addition to the session cookie — used by the MCP server and other programmatic callers. Leave empty to disable bearer-token auth. |
 
 Schema changes are applied at startup via `_run_ddl_migrations()` in `backend/main.py` using `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. There is no Alembic — when you add a new model column, also add a matching `ALTER TABLE` line in that function.
+
+### Programmatic access (API key)
+
+Set `API_KEY` to a long random string and admin endpoints will accept `Authorization: Bearer <key>` as well as the session cookie. Use this for scripts, the MCP server, or any automation that works tickets without logging in through the browser.
+
+Generate a key locally:
+
+```sh
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Set it in Railway (or wherever you run CYM) and in `backend/.env` for local dev. Never commit the key. If the key leaks, rotate it — a new value invalidates the old one immediately because there is only one active key at a time.
+
+Endpoints that accept the key (admin-only):
+
+- `GET /api/admin/tickets` (filters: `app`, `type`, `status`, `sort_by`, `sort_dir`)
+- `GET /api/admin/tickets/{id}`
+- `PATCH /api/admin/tickets/{id}` (body: `admin_priority`, `status`, `type`, `title`, `description`, `clarifying_notes`)
+- `DELETE /api/admin/tickets/{id}`
+- `POST /api/admin/apps`
+- `PATCH /api/admin/apps/{slug}`
+- `DELETE /api/admin/apps/{slug}`
+
+Deliberately **session-cookie only** (no bearer-token path):
+
+- `POST /api/admin/login`, `POST /api/admin/logout`
+- `POST /api/admin/change-password`
+
+Public (no auth required):
+
+- `POST /api/tickets`, `GET /api/tickets/{lookup_token}`, `GET /api/apps`
 
 ### Behind a reverse proxy / CDN
 

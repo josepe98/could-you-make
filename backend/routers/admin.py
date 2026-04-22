@@ -18,6 +18,8 @@ SESSION_TTL_DAYS = 7
 
 
 def require_auth(request: Request, db: Session = Depends(get_db)):
+    """Session-cookie-only auth. Used for admin password change, where we
+    never want a bearer token to be sufficient."""
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -28,6 +30,18 @@ def require_auth(request: Request, db: Session = Depends(get_db)):
     if not session:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return token
+
+
+def require_auth_or_api_key(request: Request, db: Session = Depends(get_db)):
+    """Accept either an admin session cookie or an API key in the
+    `Authorization: Bearer <key>` header. When settings.API_KEY is unset,
+    only the cookie path is available (fail-closed)."""
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        presented = auth_header.split(" ", 1)[1].strip()
+        if settings.API_KEY and secrets.compare_digest(presented, settings.API_KEY):
+            return "api_key"
+    return require_auth(request, db)
 
 
 def _check_password(password: str, db: Session) -> bool:
@@ -90,7 +104,7 @@ def change_password(data: ChangePassword, db: Session = Depends(get_db), _auth: 
 def list_tickets(
     request: Request,
     db: Session = Depends(get_db),
-    _auth: str = Depends(require_auth),
+    _auth: str = Depends(require_auth_or_api_key),
     app: Optional[str] = None,
     type: Optional[str] = None,
     status: Optional[str] = None,
@@ -113,7 +127,7 @@ def list_tickets(
 
 
 @router.get("/tickets/{ticket_id}", response_model=TicketAdmin)
-def get_ticket_admin(ticket_id: int, db: Session = Depends(get_db), _auth: str = Depends(require_auth)):
+def get_ticket_admin(ticket_id: int, db: Session = Depends(get_db), _auth: str = Depends(require_auth_or_api_key)):
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -121,7 +135,7 @@ def get_ticket_admin(ticket_id: int, db: Session = Depends(get_db), _auth: str =
 
 
 @router.patch("/tickets/{ticket_id}", response_model=TicketAdmin)
-def update_ticket(ticket_id: int, update: TicketUpdate, db: Session = Depends(get_db), _auth: str = Depends(require_auth)):
+def update_ticket(ticket_id: int, update: TicketUpdate, db: Session = Depends(get_db), _auth: str = Depends(require_auth_or_api_key)):
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -133,7 +147,7 @@ def update_ticket(ticket_id: int, update: TicketUpdate, db: Session = Depends(ge
 
 
 @router.delete("/tickets/{ticket_id}")
-def delete_ticket(ticket_id: int, db: Session = Depends(get_db), _auth: str = Depends(require_auth)):
+def delete_ticket(ticket_id: int, db: Session = Depends(get_db), _auth: str = Depends(require_auth_or_api_key)):
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")

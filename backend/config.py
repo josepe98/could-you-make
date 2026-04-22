@@ -7,6 +7,10 @@ ENV_FILE = Path(__file__).parent / ".env"
 class Settings(BaseSettings):
     DATABASE_URL: str
     ADMIN_PASSWORD: str
+    # Optional. When set, admin endpoints accept `Authorization: Bearer <key>`
+    # in addition to the session cookie — used by the MCP server and other
+    # programmatic callers. Leave empty to disable bearer-token auth entirely.
+    API_KEY: str = ""
     RESEND_API_KEY: str = ""
     FROM_EMAIL: str = ""
     FROM_NAME: str = ""

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import App, Ticket
 from ..schemas import AppOut, AppCreate, AppUpdate
-from .admin import require_auth
+from .admin import require_auth_or_api_key
 
 public_router = APIRouter(prefix="/api/apps", tags=["apps"])
 admin_router = APIRouter(prefix="/api/admin/apps", tags=["apps-admin"])
@@ -18,7 +18,7 @@ def list_apps(db: Session = Depends(get_db)):
 def create_app(
     app_in: AppCreate,
     db: Session = Depends(get_db),
-    _auth: str = Depends(require_auth),
+    _auth: str = Depends(require_auth_or_api_key),
 ):
     if db.query(App).filter(App.slug == app_in.slug).first():
         raise HTTPException(status_code=409, detail="Slug already exists")
@@ -36,7 +36,7 @@ def update_app(
     slug: str,
     update: AppUpdate,
     db: Session = Depends(get_db),
-    _auth: str = Depends(require_auth),
+    _auth: str = Depends(require_auth_or_api_key),
 ):
     app_row = db.query(App).filter(App.slug == slug).first()
     if not app_row:
@@ -57,7 +57,7 @@ def update_app(
 def delete_app(
     slug: str,
     db: Session = Depends(get_db),
-    _auth: str = Depends(require_auth),
+    _auth: str = Depends(require_auth_or_api_key),
 ):
     app_row = db.query(App).filter(App.slug == slug).first()
     if not app_row:
