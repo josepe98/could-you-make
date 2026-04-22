@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getTicket } from '../api.js'
+import { useApps } from '../AppsContext.jsx'
 
 const STATUS_BADGE = {
   'Open': 'badge-open',
@@ -9,20 +10,9 @@ const STATUS_BADGE = {
   "Won't Fix": 'badge-wont-fix',
 }
 
-const APP_LABELS = {
-  'life-folio': 'Life Folio',
-  'canopy': 'Canopy',
-  'kno': 'KNO Mgmt',
-  'practice-profiles': 'Practice Profiles',
-  'delta-mqds': 'delta-mqds',
-  'sampras': 'Sampras',
-  'proj-mgmt': 'Project Gantt',
-  'admin': 'Admin',
-  'cym': 'Could You Make',
-}
-
 export default function TicketStatus() {
   const { token } = useParams()
+  const { appLabels } = useApps()
   const [ticket, setTicket] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -53,7 +43,7 @@ export default function TicketStatus() {
             <dl className="detail-grid">
               <dt>Title</dt><dd>{ticket.title}</dd>
               <dt>Type</dt><dd>{ticket.type}</dd>
-              <dt>App</dt><dd>{APP_LABELS[ticket.app] || ticket.app}</dd>
+              <dt>App</dt><dd>{appLabels[ticket.app] || ticket.app}</dd>
               <dt>Submitted</dt><dd>{new Date(ticket.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</dd>
             </dl>
           </div>

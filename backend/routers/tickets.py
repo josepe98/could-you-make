@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import Ticket
+from ..models import Ticket, App
 from ..schemas import TicketCreate, TicketPublic, TicketCreateResponse
 from ..email_utils import send_confirmation_email
 from ..limiter import limiter
@@ -28,6 +28,10 @@ async def create_ticket(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    app_row = db.query(App).filter(App.slug == ticket_in.app).first()
+    if not app_row:
+        raise HTTPException(status_code=400, detail=f"Unknown app: {ticket_in.app}")
+
     ticket = Ticket(
         app=ticket_in.app,
         type=ticket_in.type,
@@ -51,7 +55,7 @@ async def create_ticket(
             lookup_token=ticket.lookup_token,
             title=ticket.title,
             ticket_type=ticket.type,
-            app=ticket.app,
+            app_label=app_row.label,
             urgency=ticket.submitter_urgency,
         )
 

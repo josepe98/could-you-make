@@ -12,11 +12,14 @@ The submitter experience is intentionally minimal — users submit a ticket and 
 
 ## Apps Served
 
-The set of apps and their ticket-ID prefixes is configured in code (not in the database) — see `APP_PREFIXES` and the `AppName` enum in `backend/models.py`, plus the `APP_LABELS` constants in `frontend/src/pages/`. Each app gets:
+The set of apps is managed as rows in the `apps` database table and edited through the admin UI at `/admin/apps`. On first boot, the table is seeded from `SEED_APPS` in `backend/models.py`; after that, the table is the source of truth. Each app row has:
 
-- A short slug used in the URL (e.g. `?app=blog`)
-- A 2-4 letter prefix that becomes part of every ticket's display ID (e.g. `BLOG-001`)
-- A human-readable label shown in the dashboard and submit form
+- `slug` (primary key) — short URL identifier (e.g. `?app=blog`). Lowercase alphanumeric + hyphens. **Permanent once created.**
+- `prefix` — 2-8 uppercase characters that become part of every ticket's display ID (e.g. `BLOG-001`). Unique. Editable, with a warning (changes existing tickets' display IDs).
+- `label` — human-readable name shown in the dashboard, submit form, and confirmation emails. Editable.
+- `display_order` — sort key for dropdown ordering.
+
+Frontend pages fetch `/api/apps` via `AppsContext` on mount; there are no hardcoded app lists in frontend code.
 
 ---
 
@@ -45,7 +48,7 @@ The set of apps and their ticket-ID prefixes is configured in code (not in the d
 |-------|------|-------|
 | `id` | Auto-increment | Display format is app-specific, e.g. `BLOG-001`, `STORE-014` |
 | `lookup_token` | String (64) | Random URL-safe token; used for public status URL — not guessable |
-| `app` | Enum | Configured per instance via `AppName` in `backend/models.py` |
+| `app` | String (FK → `apps.slug`) | Must match an existing row in the `apps` table |
 | `type` | Enum | Bug, Enhancement, Question |
 | `title` | String | Short summary, required |
 | `description` | Text | Full detail, required |

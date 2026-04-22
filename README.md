@@ -33,12 +33,18 @@ The full spec lives in [`REQUIREMENTS.md`](./REQUIREMENTS.md).
 
 ## Configuring your apps
 
-Add the apps you want to serve to two places:
+Apps are managed in the database, not in code. Open the admin dashboard, click **Manage apps**, and add a row with:
 
-1. `backend/models.py` — `APP_PREFIXES` dict (maps app slug → ID prefix) and the `AppName` enum
-2. `frontend/src/pages/{Submit,AdminDashboard,TicketStatus}.jsx` — the `APPS` / `APP_LABELS` constants for display names
+- **Slug** — the URL identifier, e.g. `my-app`. Permanent; choose carefully (lowercase, digits, and hyphens only).
+- **Label** — human-readable name shown in the dashboard and submit form
+- **Prefix** — the 2–8 character tag embedded in ticket IDs (e.g. `MYA` → tickets display as `MYA-001`)
+- **Order** — sort key for dropdowns (lower values appear first)
 
 Then link to `https://your-instance.example.com/submit?app=<your-app-slug>` from each app.
+
+Prefix and label can be edited later. Slugs cannot be changed after creation — delete and re-create if you need a different slug (and only after reassigning any tickets). Apps that have tickets cannot be deleted.
+
+First-run seed: if the `apps` table is empty on boot, it's populated from the hardcoded list in `backend/models.py:SEED_APPS`. After that, the table is the source of truth.
 
 ## Local development
 

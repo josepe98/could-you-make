@@ -1,24 +1,12 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { submitTicket } from '../api.js'
-
-const APPS = [
-  { value: 'life-folio', label: 'Life Folio' },
-  { value: 'canopy', label: 'Canopy' },
-  { value: 'kno', label: 'KNO Mgmt' },
-  { value: 'practice-profiles', label: 'Practice Profiles' },
-  { value: 'delta-mqds', label: 'delta-mqds' },
-  { value: 'sampras', label: 'Sampras' },
-  { value: 'proj-mgmt', label: 'Project Gantt' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'cym', label: 'Could You Make' },
-]
-
-const APP_LABELS = Object.fromEntries(APPS.map(a => [a.value, a.label]))
+import { useApps } from '../AppsContext.jsx'
 
 export default function Submit() {
   const [params] = useSearchParams()
   const presetApp = params.get('app') || ''
+  const { apps } = useApps()
 
   const [form, setForm] = useState({
     app: presetApp,
@@ -91,7 +79,7 @@ export default function Submit() {
               required
             >
               <option value="">Select an app…</option>
-              {APPS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+              {apps.map(a => <option key={a.slug} value={a.slug}>{a.label}</option>)}
             </select>
           </div>
 

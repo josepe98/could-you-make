@@ -63,6 +63,52 @@ export async function deleteTicket(id) {
   return res.json()
 }
 
+export async function listApps() {
+  const res = await fetch(`${BASE}/apps`)
+  if (!res.ok) throw new Error('Failed to load apps')
+  return res.json()
+}
+
+export async function createApp(data) {
+  const res = await fetch(`${BASE}/admin/apps`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Failed to create app')
+  }
+  return res.json()
+}
+
+export async function updateApp(slug, data) {
+  const res = await fetch(`${BASE}/admin/apps/${slug}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Failed to update app')
+  }
+  return res.json()
+}
+
+export async function deleteApp(slug) {
+  const res = await fetch(`${BASE}/admin/apps/${slug}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Failed to delete app')
+  }
+  return res.json()
+}
+
 export async function changePassword(currentPassword, newPassword) {
   const res = await fetch(`${BASE}/admin/change-password`, {
     method: 'POST',

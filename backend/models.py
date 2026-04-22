@@ -1,49 +1,23 @@
 import enum
 import secrets
 from datetime import datetime, timezone
-from sqlalchemy import Integer, String, Text, Enum as SAEnum, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Integer, String, Text, Enum as SAEnum, DateTime, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
 
-APP_PREFIXES = {
-    "life-folio": "LF",
-    "canopy": "CAN",
-    "kno": "KNO",
-    "practice-profiles": "PP",
-    "delta-mqds": "DLT",
-    "sampras": "SAM",
-    "proj-mgmt": "PM",
-    "admin": "ADM",
-    "cym": "CYM",
-}
-
-# Human-readable app names. Used anywhere we display an app to a person
-# (confirmation emails, future admin exports, etc.). The frontend keeps
-# its own copy of this in the APP_LABELS constants on each page — keep
-# the two in sync.
-APP_LABELS = {
-    "life-folio": "Life Folio",
-    "canopy": "Canopy",
-    "kno": "KNO Mgmt",
-    "practice-profiles": "Practice Profiles",
-    "delta-mqds": "delta-mqds",
-    "sampras": "Sampras",
-    "proj-mgmt": "Project Gantt",
-    "admin": "Admin",
-    "cym": "Could You Make",
-}
-
-
-class AppName(str, enum.Enum):
-    life_folio = "life-folio"
-    canopy = "canopy"
-    kno = "kno"
-    practice_profiles = "practice-profiles"
-    delta_mqds = "delta-mqds"
-    sampras = "sampras"
-    proj_mgmt = "proj-mgmt"
-    admin = "admin"
-    cym = "cym"
+# Seed list used once, on the first deploy that runs the apps-table migration.
+# After that, apps are managed through the admin UI / API.
+SEED_APPS = [
+    ("life-folio", "Life Folio", "LF", 0),
+    ("canopy", "Canopy", "CAN", 1),
+    ("kno", "KNO Mgmt", "KNO", 2),
+    ("practice-profiles", "Practice Profiles", "PP", 3),
+    ("delta-mqds", "delta-mqds", "DLT", 4),
+    ("sampras", "Sampras", "SAM", 5),
+    ("proj-mgmt", "Project Gantt", "PM", 6),
+    ("admin", "Admin", "ADM", 7),
+    ("cym", "Could You Make", "CYM", 8),
+]
 
 
 class TicketType(str, enum.Enum):
@@ -76,11 +50,29 @@ def _values(e):
     return [m.value for m in e]
 
 
+class App(Base):
+    __tablename__ = "apps"
+
+    slug: Mapped[str] = mapped_column(String(64), primary_key=True)
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(8), unique=True, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 class Ticket(Base):
     __tablename__ = "tickets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    app: Mapped[str] = mapped_column(SAEnum(AppName, values_callable=_values), nullable=False)
+    app: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("apps.slug", name="tickets_app_fkey"),
+        nullable=False,
+        index=True,
+    )
     type: Mapped[str] = mapped_column(SAEnum(TicketType, values_callable=_values), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -107,10 +99,11 @@ class Ticket(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
+    app_obj: Mapped[App] = relationship(App, lazy="joined")
+
     @property
     def display_id(self) -> str:
-        prefix = APP_PREFIXES[self.app]
-        return f"{prefix}-{self.id:03d}"
+        return f"{self.app_obj.prefix}-{self.id:03d}"
 
 
 class AdminPassword(Base):

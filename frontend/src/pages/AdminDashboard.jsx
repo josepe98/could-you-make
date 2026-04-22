@@ -1,18 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getAdminTickets, updateTicket, deleteTicket, adminLogout, changePassword } from '../api.js'
-
-const APP_LABELS = {
-  'life-folio': 'Life Folio',
-  'canopy': 'Canopy',
-  'kno': 'KNO Mgmt',
-  'practice-profiles': 'Practice Profiles',
-  'delta-mqds': 'delta-mqds',
-  'sampras': 'Sampras',
-  'proj-mgmt': 'Project Gantt',
-  'admin': 'Admin',
-  'cym': 'Could You Make',
-}
+import { useApps } from '../AppsContext.jsx'
+import { useConfirm } from '../ConfirmDialog.jsx'
 
 // Temporarily hide the admin Priority column to give Title more room.
 // All infrastructure (model field, API, detail drawer) is intact — flip
@@ -91,6 +81,8 @@ function SortHeader({ label, field, sortBy, sortDir, onSort, onResize }) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
+  const { apps, appLabels } = useApps()
+  const confirm = useConfirm()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -208,7 +200,13 @@ export default function AdminDashboard() {
   }
 
   async function handleDelete(ticket) {
-    if (!confirm(`Delete ${ticket.display_id}? This cannot be undone.`)) return
+    const ok = await confirm({
+      title: `Delete ${ticket.display_id}?`,
+      body: `"${ticket.title}"\n\nThis cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await deleteTicket(ticket.id)
       setTickets(ts => ts.filter(t => t.id !== ticket.id))
@@ -259,7 +257,7 @@ export default function AdminDashboard() {
       style={{ cursor: 'pointer', viewTransitionName: `ticket-row-${t.id}` }}
     >
       <td onClick={() => openDetail(t)}><code style={{ fontSize: '0.8rem' }}>{displayId(t)}</code></td>
-      <td onClick={() => openDetail(t)}>{APP_LABELS[t.app] || t.app}</td>
+      <td onClick={() => openDetail(t)}>{appLabels[t.app] || t.app}</td>
       <td onClick={() => openDetail(t)}>{t.type}</td>
       <td onClick={() => openDetail(t)}>{t.title}</td>
       <td onClick={() => openDetail(t)}>
@@ -347,6 +345,9 @@ export default function AdminDashboard() {
             <p className="subtitle" style={{ marginBottom: 0 }}>Admin dashboard · {tickets.length} ticket{tickets.length !== 1 ? 's' : ''}</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/admin/apps')}>
+              Manage apps
+            </button>
             <button className="btn btn-secondary btn-sm" onClick={() => { setShowPwForm(f => !f); setPwError(null); setPwSuccess(false) }}>
               {showPwForm ? 'Cancel' : 'Change password'}
             </button>
@@ -379,7 +380,7 @@ export default function AdminDashboard() {
         <div className="filters" style={{ marginBottom: 16 }}>
           <select value={filters.app} onChange={e => setFilter('app', e.target.value)}>
             <option value="">All apps</option>
-            {Object.entries(APP_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            {apps.map(a => <option key={a.slug} value={a.slug}>{a.label}</option>)}
           </select>
           <select value={filters.type} onChange={e => setFilter('type', e.target.value)}>
             <option value="">All types</option>
@@ -462,7 +463,7 @@ export default function AdminDashboard() {
             </div>
 
             <dl className="detail-grid" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-              <dt>App</dt><dd>{APP_LABELS[selected.app] || selected.app}</dd>
+              <dt>App</dt><dd>{appLabels[selected.app] || selected.app}</dd>
               <dt>Submitter urgency</dt><dd>{selected.submitter_urgency}</dd>
               <dt>Email</dt><dd>{selected.submitter_email || <span style={{ color: 'var(--text-muted)' }}>—</span>}</dd>
               <dt>Created</dt><dd>{new Date(selected.created_at).toLocaleString()}</dd>

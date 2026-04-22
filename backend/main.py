@@ -10,10 +10,10 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from .limiter import limiter
 from .database import Base, engine, SessionLocal
-from .models import AdminPassword, Ticket
+from .models import AdminPassword, Ticket, App, SEED_APPS
 from .auth import hash_password
 from .config import settings
-from .routers import tickets, admin
+from .routers import tickets, admin, apps
 
 Base.metadata.create_all(bind=engine)
 
@@ -33,7 +33,12 @@ def _run_ddl_migrations():
     """Add any columns missing from older schemas. Must run before any ORM
     queries, because SQLAlchemy SELECTs include every column on the model —
     a missing column would crash the query and prevent later migrations from
-    running."""
+    running.
+
+    The apps-table migration here is idempotent: it guards on pg_type to
+    detect the legacy appname enum and only converts the column the first
+    time new code runs against an old DB. Subsequent runs are no-ops.
+    """
     with engine.connect() as conn:
         conn.execute(text(
             "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS "
@@ -42,9 +47,50 @@ def _run_ddl_migrations():
         conn.execute(text(
             "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS clarifying_notes TEXT"
         ))
-        conn.execute(text("ALTER TYPE appname ADD VALUE IF NOT EXISTS 'admin'"))
-        conn.execute(text("ALTER TYPE appname ADD VALUE IF NOT EXISTS 'cym'"))
+
+        # Retire the appname PG enum in favour of a data-driven apps table.
+        # We only convert the column here; the FK constraint is added later
+        # (in _add_apps_fkey), after the apps table has been seeded so the
+        # constraint doesn't fail against existing tickets.
+        enum_exists = conn.execute(text(
+            "SELECT 1 FROM pg_type WHERE typname = 'appname'"
+        )).scalar()
+        if enum_exists:
+            conn.execute(text(
+                "ALTER TABLE tickets ALTER COLUMN app TYPE VARCHAR(64) USING app::text"
+            ))
+            conn.execute(text("DROP TYPE appname"))
+
         conn.commit()
+
+
+def _seed_apps():
+    """Populate the apps table on first run. Only inserts missing slugs so
+    admin-managed changes are never overwritten."""
+    db = SessionLocal()
+    try:
+        for slug, label, prefix, display_order in SEED_APPS:
+            if not db.query(App).filter(App.slug == slug).first():
+                db.add(App(slug=slug, label=label, prefix=prefix, display_order=display_order))
+        db.commit()
+    finally:
+        db.close()
+
+
+def _add_apps_fkey():
+    """Add the tickets.app -> apps.slug foreign key once the apps table has
+    been seeded. On a fresh DB, create_all already added the constraint — we
+    only need this to backfill it on legacy DBs that are being migrated."""
+    with engine.connect() as conn:
+        fkey_exists = conn.execute(text(
+            "SELECT 1 FROM pg_constraint WHERE conname = 'tickets_app_fkey'"
+        )).scalar()
+        if not fkey_exists:
+            conn.execute(text(
+                "ALTER TABLE tickets ADD CONSTRAINT tickets_app_fkey "
+                "FOREIGN KEY (app) REFERENCES apps(slug)"
+            ))
+            conn.commit()
 
 
 def _backfill_lookup_tokens():
@@ -61,6 +107,8 @@ def _backfill_lookup_tokens():
 
 
 _run_ddl_migrations()
+_seed_apps()
+_add_apps_fkey()
 _seed_admin_password()
 _backfill_lookup_tokens()
 
@@ -101,6 +149,8 @@ app.add_middleware(
 
 app.include_router(tickets.router)
 app.include_router(admin.router)
+app.include_router(apps.public_router)
+app.include_router(apps.admin_router)
 
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
 if frontend_dist.exists():

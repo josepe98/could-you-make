@@ -1,11 +1,11 @@
 from datetime import datetime
 from typing import Annotated, Optional
 from pydantic import BaseModel, EmailStr, Field
-from .models import AppName, TicketType, Urgency, Priority, Status
+from .models import TicketType, Urgency, Priority, Status
 
 
 class TicketCreate(BaseModel):
-    app: AppName
+    app: str
     type: TicketType
     title: str
     description: str
@@ -17,7 +17,7 @@ class TicketPublic(BaseModel):
     display_id: str
     title: str
     type: TicketType
-    app: AppName
+    app: str
     status: Status
     created_at: datetime
 
@@ -27,7 +27,7 @@ class TicketPublic(BaseModel):
 class TicketAdmin(BaseModel):
     id: int
     display_id: str
-    app: AppName
+    app: str
     type: TicketType
     title: str
     description: str
@@ -64,3 +64,25 @@ class TicketCreateResponse(BaseModel):
     display_id: str
     lookup_token: str
     message: str
+
+
+class AppOut(BaseModel):
+    slug: str
+    label: str
+    prefix: str
+    display_order: int
+
+    model_config = {"from_attributes": True}
+
+
+class AppCreate(BaseModel):
+    slug: Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9-]*$")]
+    label: Annotated[str, Field(min_length=1, max_length=128)]
+    prefix: Annotated[str, Field(min_length=1, max_length=8, pattern=r"^[A-Z0-9]+$")]
+    display_order: int = 0
+
+
+class AppUpdate(BaseModel):
+    label: Optional[Annotated[str, Field(min_length=1, max_length=128)]] = None
+    prefix: Optional[Annotated[str, Field(min_length=1, max_length=8, pattern=r"^[A-Z0-9]+$")]] = None
+    display_order: Optional[int] = None

@@ -238,6 +238,25 @@ td select {
 }
 .drawer-header { display: flex; justify-content: space-between; align-items: flex-start; }
 
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 200;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  width: 440px;
+  max-width: 100%;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.18);
+}
+
 @media (max-width: 640px) {
   .card { padding: 20px; }
   .drawer { width: 100vw; }

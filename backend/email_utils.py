@@ -3,7 +3,6 @@ import enum
 import logging
 import resend
 from .config import settings
-from .models import APP_LABELS
 
 log = logging.getLogger("cym.email")
 
@@ -28,7 +27,7 @@ async def send_confirmation_email(
     lookup_token: str,
     title: str,
     ticket_type: str,
-    app: str,
+    app_label: str,
     urgency: str,
 ):
     if not settings.RESEND_API_KEY:
@@ -40,8 +39,6 @@ async def send_confirmation_email(
 
     ticket_type = _display(ticket_type)
     urgency = _display(urgency)
-    app_slug = _display(app)
-    app_label = APP_LABELS.get(app_slug, app_slug)
 
     ticket_url = f"{settings.BASE_URL}/ticket/{lookup_token}"
 
