@@ -155,11 +155,11 @@ export default function AdminDashboard() {
         setTickets(ts => ts.map(t => t.id === updated.id ? updated : t))
         if (selected?.id === updated.id) setSelected(updated)
       }
-      // Animate row sliding between the open and done tables when status
-      // crosses the Done boundary, using the View Transitions API.
+      // Animate row sliding between section tables when status changes,
+      // using the View Transitions API.
       const crossed =
         field === 'status' &&
-        (ticket.status === 'Done') !== (updated.status === 'Done') &&
+        ticket.status !== updated.status &&
         typeof document !== 'undefined' &&
         typeof document.startViewTransition === 'function'
       if (crossed) {
@@ -248,8 +248,9 @@ export default function AdminDashboard() {
 
   const displayId = t => t.display_id || `CYM-${String(t.id).padStart(3, '0')}`
 
-  const openTickets = tickets.filter(t => t.status !== 'Done')
-  const doneTickets = tickets.filter(t => t.status === 'Done')
+  const inProgressTickets = tickets.filter(t => t.status === 'In Progress')
+  const openTickets = tickets.filter(t => t.status === 'Open')
+  const closedTickets = tickets.filter(t => t.status === 'Done' || t.status === "Won't Fix")
 
   const renderRow = (t) => (
     <tr
@@ -403,13 +404,17 @@ export default function AdminDashboard() {
         {!loading && !error && (
           <>
             <h2 style={{ fontSize: '1rem', marginTop: 0, marginBottom: 8, color: 'var(--text-muted)' }}>
-              Active · {openTickets.length}
+              In Progress · {inProgressTickets.length}
             </h2>
-            {renderTable(openTickets, 'No active tickets match the current filters.')}
+            {renderTable(inProgressTickets, 'No in-progress tickets.')}
             <h2 style={{ fontSize: '1rem', marginTop: 24, marginBottom: 8, color: 'var(--text-muted)' }}>
-              Done · {doneTickets.length}
+              Open · {openTickets.length}
             </h2>
-            {renderTable(doneTickets, 'No completed tickets.')}
+            {renderTable(openTickets, 'No open tickets match the current filters.')}
+            <h2 style={{ fontSize: '1rem', marginTop: 24, marginBottom: 8, color: 'var(--text-muted)' }}>
+              Done or Won't Fix · {closedTickets.length}
+            </h2>
+            {renderTable(closedTickets, 'No completed tickets.')}
           </>
         )}
       </div>
@@ -461,6 +466,15 @@ export default function AdminDashboard() {
                 <option value="Won't Fix">Won't Fix</option>
               </select>
             </div>
+
+            {selected.clarifying_notes && (
+              <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                <label>Clarifying notes</label>
+                <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.875rem', color: 'var(--text)', background: 'var(--bg-subtle, #f6f6f6)', padding: 12, borderRadius: 6 }}>
+                  {selected.clarifying_notes}
+                </div>
+              </div>
+            )}
 
             <dl className="detail-grid" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
               <dt>App</dt><dd>{appLabels[selected.app] || selected.app}</dd>
