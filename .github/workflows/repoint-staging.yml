@@ -21,43 +21,88 @@ jobs:
             echo "branch=${{ github.event.pull_request.head.ref }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Update Railway Staging deploy branch
+      - name: Update Railway Staging deploy trigger and redeploy
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
           TARGET_BRANCH: ${{ steps.target.outputs.branch }}
+          PROJECT_ID: be40a808-a2cb-45f8-9ad2-6c8ec105a08c
           SERVICE_ID: 1d7ab0e5-d061-44a4-a380-2c8bc539a0de
           ENVIRONMENT_ID: 67cf68d1-c955-44ff-a5cf-2ae6c3975da0
         run: |
           set -euo pipefail
+          API="https://backboard.railway.com/graphql/v2"
+          AUTH_HEADER="Authorization: Bearer ${RAILWAY_API_TOKEN}"
+          CT_HEADER="Content-Type: application/json"
 
-          payload=$(jq -nc \
-            --arg serviceId "$SERVICE_ID" \
+          # 1) Look up the deployment trigger ID for this (project, env, service).
+          query_payload=$(jq -nc \
+            --arg projectId "$PROJECT_ID" \
             --arg environmentId "$ENVIRONMENT_ID" \
-            --arg branch "$TARGET_BRANCH" \
+            --arg serviceId "$SERVICE_ID" \
             '{
-              query: "mutation Repoint($serviceId: String!, $environmentId: String!, $input: ServiceInstanceUpdateInput!) { serviceInstanceUpdate(serviceId: $serviceId, environmentId: $environmentId, input: $input) }",
-              variables: {
-                serviceId: $serviceId,
-                environmentId: $environmentId,
-                input: { branch: $branch }
-              }
+              query: "query($projectId: String!, $environmentId: String!, $serviceId: String!) { deploymentTriggers(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) { edges { node { id branch } } } }",
+              variables: { projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId }
             }')
 
-          response=$(curl -sS -X POST https://backboard.railway.com/graphql/v2 \
-            -H "Authorization: Bearer ${RAILWAY_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "$payload")
+          query_response=$(curl -sS -X POST "$API" -H "$AUTH_HEADER" -H "$CT_HEADER" -d "$query_payload")
+          echo "Trigger lookup response: $query_response"
 
-          echo "Railway response: $response"
-
-          if echo "$response" | jq -e '.errors' > /dev/null; then
-            echo "::error::Railway API returned errors"
+          if echo "$query_response" | jq -e '.errors' > /dev/null; then
+            echo "::error::Trigger lookup returned errors"
             exit 1
           fi
 
-          if ! echo "$response" | jq -e '.data.serviceInstanceUpdate' > /dev/null; then
-            echo "::error::Unexpected response shape from Railway"
+          trigger_id=$(echo "$query_response" | jq -r '.data.deploymentTriggers.edges[0].node.id // empty')
+          if [ -z "$trigger_id" ]; then
+            echo "::error::No deployment trigger found for service in this environment"
+            exit 1
+          fi
+          echo "Found deployment trigger: $trigger_id"
+
+          # 2) Update the trigger's branch.
+          update_payload=$(jq -nc \
+            --arg id "$trigger_id" \
+            --arg branch "$TARGET_BRANCH" \
+            '{
+              query: "mutation($id: String!, $input: DeploymentTriggerUpdateInput!) { deploymentTriggerUpdate(id: $id, input: $input) { id branch } }",
+              variables: { id: $id, input: { branch: $branch } }
+            }')
+
+          update_response=$(curl -sS -X POST "$API" -H "$AUTH_HEADER" -H "$CT_HEADER" -d "$update_payload")
+          echo "Trigger update response: $update_response"
+
+          if echo "$update_response" | jq -e '.errors' > /dev/null; then
+            echo "::error::Trigger update returned errors"
             exit 1
           fi
 
-          echo "Repointed Staging to branch: $TARGET_BRANCH"
+          new_branch=$(echo "$update_response" | jq -r '.data.deploymentTriggerUpdate.branch // empty')
+          if [ "$new_branch" != "$TARGET_BRANCH" ]; then
+            echo "::error::Mutation returned unexpected branch: '$new_branch' (expected '$TARGET_BRANCH')"
+            exit 1
+          fi
+          echo "Branch updated to: $new_branch"
+
+          # 3) Explicitly deploy the latest commit on the new branch.
+          deploy_payload=$(jq -nc \
+            --arg environmentId "$ENVIRONMENT_ID" \
+            --arg serviceId "$SERVICE_ID" \
+            '{
+              query: "mutation($environmentId: String!, $serviceId: String!) { serviceInstanceDeployV2(environmentId: $environmentId, serviceId: $serviceId, latestCommit: true) }",
+              variables: { environmentId: $environmentId, serviceId: $serviceId }
+            }')
+
+          deploy_response=$(curl -sS -X POST "$API" -H "$AUTH_HEADER" -H "$CT_HEADER" -d "$deploy_payload")
+          echo "Deploy response: $deploy_response"
+
+          if echo "$deploy_response" | jq -e '.errors' > /dev/null; then
+            echo "::error::Deploy mutation returned errors"
+            exit 1
+          fi
+
+          deployment_id=$(echo "$deploy_response" | jq -r '.data.serviceInstanceDeployV2 // empty')
+          if [ -z "$deployment_id" ]; then
+            echo "::error::Deploy mutation did not return a deployment ID"
+            exit 1
+          fi
+          echo "Triggered deployment: $deployment_id (Staging now on '$TARGET_BRANCH')"
