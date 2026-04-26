@@ -19,7 +19,7 @@ You run one instance of Could You Make and point each of your apps at it. Each a
 - Active and Done tickets render in separate tables; rows animate between them as you triage
 - Inline status editing, drag-to-resize columns (persisted per browser)
 - Per-app ticket ID prefixes (e.g. `BLOG-001`, `STORE-014`) so you can reference tickets unambiguously
-- Optional confirmation emails to submitters via SMTP
+- Optional confirmation emails to submitters via Resend
 
 The full spec lives in [`REQUIREMENTS.md`](./REQUIREMENTS.md).
 
