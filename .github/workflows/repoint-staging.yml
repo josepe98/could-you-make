@@ -1,0 +1,63 @@
+name: Repoint Staging at PR
+
+on:
+  pull_request:
+    types: [opened, reopened, closed]
+
+concurrency:
+  group: repoint-staging
+  cancel-in-progress: false
+
+jobs:
+  repoint-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine target branch
+        id: target
+        run: |
+          if [ "${{ github.event.action }}" = "closed" ]; then
+            echo "branch=main" >> "$GITHUB_OUTPUT"
+          else
+            echo "branch=${{ github.event.pull_request.head.ref }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update Railway Staging deploy branch
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          TARGET_BRANCH: ${{ steps.target.outputs.branch }}
+          SERVICE_ID: 1d7ab0e5-d061-44a4-a380-2c8bc539a0de
+          ENVIRONMENT_ID: 67cf68d1-c955-44ff-a5cf-2ae6c3975da0
+        run: |
+          set -euo pipefail
+
+          payload=$(jq -nc \
+            --arg serviceId "$SERVICE_ID" \
+            --arg environmentId "$ENVIRONMENT_ID" \
+            --arg branch "$TARGET_BRANCH" \
+            '{
+              query: "mutation Repoint($serviceId: String!, $environmentId: String!, $input: ServiceInstanceUpdateInput!) { serviceInstanceUpdate(serviceId: $serviceId, environmentId: $environmentId, input: $input) }",
+              variables: {
+                serviceId: $serviceId,
+                environmentId: $environmentId,
+                input: { branch: $branch }
+              }
+            }')
+
+          response=$(curl -sS -X POST https://backboard.railway.com/graphql/v2 \
+            -H "Authorization: Bearer ${RAILWAY_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$payload")
+
+          echo "Railway response: $response"
+
+          if echo "$response" | jq -e '.errors' > /dev/null; then
+            echo "::error::Railway API returned errors"
+            exit 1
+          fi
+
+          if ! echo "$response" | jq -e '.data.serviceInstanceUpdate' > /dev/null; then
+            echo "::error::Unexpected response shape from Railway"
+            exit 1
+          fi
+
+          echo "Repointed Staging to branch: $TARGET_BRANCH"
