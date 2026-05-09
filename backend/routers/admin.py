@@ -134,13 +134,23 @@ def get_ticket_admin(ticket_id: int, db: Session = Depends(get_db), _auth: str =
     return ticket
 
 
+CLOSED_STATUSES = {"Done", "Won't Fix"}
+
 @router.patch("/tickets/{ticket_id}", response_model=TicketAdmin)
 def update_ticket(ticket_id: int, update: TicketUpdate, db: Session = Depends(get_db), _auth: str = Depends(require_auth_or_api_key)):
+    from datetime import datetime, timezone
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
+    new_status = update.status
+    old_status = ticket.status
     for field, value in update.model_dump(exclude_none=True).items():
         setattr(ticket, field, value)
+    if new_status is not None:
+        if new_status in CLOSED_STATUSES and old_status not in CLOSED_STATUSES:
+            ticket.resolved_at = datetime.now(timezone.utc)
+        elif new_status not in CLOSED_STATUSES:
+            ticket.resolved_at = None
     db.commit()
     db.refresh(ticket)
     return ticket

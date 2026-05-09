@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import {
   DndContext, DragOverlay,
@@ -113,7 +114,6 @@ function StatsBar({ tickets }) {
     { label: 'In Progress', value: count('In Progress') },
     { label: 'Done', value: count('Done') },
     { label: "Won't Fix", value: count("Won't Fix") },
-    { label: 'This week', value: thisWeek, delta },
   ]
 
   return (
@@ -122,13 +122,65 @@ function StatsBar({ tickets }) {
         <div key={s.label} className="stats-card">
           <span className="stats-value">{s.value}</span>
           <span className="stats-label">{s.label}</span>
-          {s.delta != null && s.delta !== 0 && (
-            <span className={`stats-trend stats-trend--${s.delta > 0 ? 'up' : 'down'}`}>
-              {s.delta > 0 ? `+${s.delta}` : s.delta} vs last wk
-            </span>
-          )}
         </div>
       ))}
+    </div>
+  )
+}
+
+// ── Activity modal ────────────────────────────────────────────────────────────
+
+function buildWeeklyData(tickets) {
+  if (!tickets.length) return []
+  const weekMs = 7 * 24 * 60 * 60 * 1000
+  // Show last 12 weeks
+  const now = Date.now()
+  const weeks = Array.from({ length: 12 }, (_, i) => {
+    const end = now - i * weekMs
+    const start = end - weekMs
+    return { start, end }
+  }).reverse()
+
+  return weeks.map(({ start, end }) => {
+    const startDate = new Date(start)
+    const label = `${startDate.toLocaleString('default', { month: 'short' })} ${startDate.getDate()}`
+    const opened = tickets.filter(t => {
+      const ms = new Date(t.created_at).getTime()
+      return ms >= start && ms < end
+    }).length
+    const closed = tickets.filter(t => {
+      if (!t.resolved_at) return false
+      const ms = new Date(t.resolved_at).getTime()
+      return ms >= start && ms < end
+    }).length
+    return { label, opened, closed }
+  })
+}
+
+function ActivityModal({ tickets, onClose }) {
+  const data = useMemo(() => buildWeeklyData(tickets), [tickets])
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal activity-modal" onClick={e => e.stopPropagation()}>
+        <div className="drawer-header" style={{ marginBottom: 24 }}>
+          <h2 style={{ marginBottom: 0 }}>Activity</h2>
+          <button className="btn btn-secondary btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 20 }}>
+          Tickets opened and closed per week (last 12 weeks). Closed = moved to Done or Won't Fix.
+        </p>
+        <ResponsiveContainer width="100%" height={320}>
+          <BarChart data={data} barCategoryGap="30%" barGap={3}>
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
+            <Tooltip />
+            <Legend wrapperStyle={{ fontSize: 13 }} />
+            <Bar dataKey="opened" name="Opened" fill="var(--accent)" radius={[3,3,0,0]} />
+            <Bar dataKey="closed" name="Closed" fill="var(--success)" radius={[3,3,0,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }
@@ -258,6 +310,7 @@ export default function AdminDashboard() {
     handleInlineChange(ticket, 'status', over.id)
   }
 
+  const [showActivity, setShowActivity] = useState(false)
   const [showPwForm, setShowPwForm] = useState(false)
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
   const [pwError, setPwError] = useState(null)
@@ -488,6 +541,9 @@ export default function AdminDashboard() {
             <button className="btn btn-secondary btn-sm" onClick={() => navigate('/admin/apps')}>
               Manage apps
             </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowActivity(true)}>
+              Activity
+            </button>
             <button className="btn btn-secondary btn-sm" onClick={() => { setShowPwForm(f => !f); setPwError(null); setPwSuccess(false) }}>
               {showPwForm ? 'Cancel' : 'Change password'}
             </button>
@@ -611,6 +667,8 @@ export default function AdminDashboard() {
           </>
         )}
       </div>
+
+      {showActivity && <ActivityModal tickets={tickets} onClose={() => setShowActivity(false)} />}
 
       {/* Detail drawer */}
       {selected && editDraft && (

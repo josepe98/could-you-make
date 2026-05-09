@@ -257,6 +257,11 @@ td select {
   box-shadow: 0 10px 40px rgba(0,0,0,0.18);
 }
 
+.activity-modal {
+  width: 720px;
+  max-width: calc(100vw - 40px);
+}
+
 /* Stats bar */
 .stats-bar {
   display: flex;
