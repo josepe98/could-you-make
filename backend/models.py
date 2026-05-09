@@ -1,6 +1,7 @@
 import enum
 import secrets
 from datetime import datetime, timezone
+from typing import Optional
 from sqlalchemy import Integer, String, Text, Enum as SAEnum, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
@@ -89,6 +90,9 @@ class Ticket(Base):
         default=lambda: secrets.token_urlsafe(32),
     )
     clarifying_notes: Mapped[str] = mapped_column(Text, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

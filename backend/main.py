@@ -47,6 +47,14 @@ def _run_ddl_migrations():
         conn.execute(text(
             "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS clarifying_notes TEXT"
         ))
+        conn.execute(text(
+            "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ"
+        ))
+        # Backfill resolved_at for existing closed tickets using their last updated_at.
+        conn.execute(text(
+            "UPDATE tickets SET resolved_at = updated_at "
+            "WHERE status IN ('Done', 'Won''t Fix') AND resolved_at IS NULL"
+        ))
 
         # Retire the appname PG enum in favour of a data-driven apps table.
         # We only convert the column here; the FK constraint is added later

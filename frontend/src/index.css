@@ -257,6 +257,54 @@ td select {
   box-shadow: 0 10px 40px rgba(0,0,0,0.18);
 }
 
+.activity-modal {
+  width: 1080px;
+  max-width: calc(100vw - 40px);
+}
+
+/* Stats bar */
+.stats-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.stats-card {
+  flex: 1;
+  min-width: 72px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats-value {
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+
+.stats-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.stats-trend {
+  font-size: 0.7rem;
+  margin-top: 3px;
+  font-weight: 500;
+}
+.stats-trend--up { color: var(--success); }
+.stats-trend--down { color: var(--danger); }
+
 /* View toggle */
 .view-toggle {
   display: flex;

@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import {
   DndContext, DragOverlay,
@@ -88,6 +89,108 @@ function SortHeader({ label, field, sortBy, sortDir, onSort, onResize }) {
       {label}{arrow}
       {onResize && <ResizeHandle onMouseDown={onResize} />}
     </th>
+  )
+}
+
+// ── Stats bar ────────────────────────────────────────────────────────────────
+
+function StatsBar({ tickets }) {
+  const now = Date.now()
+  const oneWeekMs = 7 * 24 * 60 * 60 * 1000
+  const oneWeekAgo = now - oneWeekMs
+  const twoWeeksAgo = now - 2 * oneWeekMs
+
+  const count = status => tickets.filter(t => t.status === status).length
+  const thisWeek = tickets.filter(t => new Date(t.created_at).getTime() >= oneWeekAgo).length
+  const lastWeek = tickets.filter(t => {
+    const ms = new Date(t.created_at).getTime()
+    return ms >= twoWeeksAgo && ms < oneWeekAgo
+  }).length
+  const delta = thisWeek - lastWeek
+
+  const stats = [
+    { label: 'Total', value: tickets.length },
+    { label: 'Open', value: count('Open') },
+    { label: 'In Progress', value: count('In Progress') },
+    { label: 'Done', value: count('Done') },
+    { label: "Won't Fix", value: count("Won't Fix") },
+  ]
+
+  return (
+    <div className="stats-bar">
+      {stats.map(s => (
+        <div key={s.label} className="stats-card">
+          <span className="stats-value">{s.value}</span>
+          <span className="stats-label">{s.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Activity modal ────────────────────────────────────────────────────────────
+
+function buildWeeklyData(tickets) {
+  if (!tickets.length) return []
+  const weekMs = 7 * 24 * 60 * 60 * 1000
+  // Show last 12 weeks
+  const now = Date.now()
+  const weeks = Array.from({ length: 12 }, (_, i) => {
+    const end = now - i * weekMs
+    const start = end - weekMs
+    return { start, end }
+  }).reverse()
+
+  return weeks.map(({ start, end }) => {
+    const startDate = new Date(start)
+    const label = `${startDate.toLocaleString('default', { month: 'short' })} ${startDate.getDate()}`
+    const opened = tickets.filter(t => {
+      const ms = new Date(t.created_at).getTime()
+      return ms >= start && ms < end
+    }).length
+    const closed = tickets.filter(t => {
+      if (!t.resolved_at) return false
+      const ms = new Date(t.resolved_at).getTime()
+      return ms >= start && ms < end
+    }).length
+    return { label, opened, closed }
+  })
+}
+
+function ActivityModal({ tickets, onClose }) {
+  const data = useMemo(() => buildWeeklyData(tickets), [tickets])
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal activity-modal" onClick={e => e.stopPropagation()}>
+        <div className="drawer-header" style={{ marginBottom: 24 }}>
+          <h2 style={{ marginBottom: 0 }}>Activity</h2>
+          <button className="btn btn-secondary btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 20 }}>
+          Tickets opened and closed per week (last 12 weeks). Closed = moved to Done or Won't Fix.
+        </p>
+        <ResponsiveContainer width="100%" height={320}>
+          <BarChart data={data} barCategoryGap="30%" barGap={3}>
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
+            <Tooltip />
+            <Legend content={() => (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 20, fontSize: 13, paddingTop: 8 }}>
+                {[['#2563eb', 'Opened'], ['#16a34a', 'Closed']].map(([color, label]) => (
+                  <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ display: 'inline-block', width: 12, height: 12, background: color, borderRadius: 2 }} />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            )} />
+            <Bar dataKey="opened" name="Opened" fill="#2563eb" radius={[3,3,0,0]} />
+            <Bar dataKey="closed" name="Closed" fill="#16a34a" radius={[3,3,0,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   )
 }
 
@@ -216,6 +319,7 @@ export default function AdminDashboard() {
     handleInlineChange(ticket, 'status', over.id)
   }
 
+  const [showActivity, setShowActivity] = useState(false)
   const [showPwForm, setShowPwForm] = useState(false)
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
   const [pwError, setPwError] = useState(null)
@@ -446,6 +550,9 @@ export default function AdminDashboard() {
             <button className="btn btn-secondary btn-sm" onClick={() => navigate('/admin/apps')}>
               Manage apps
             </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowActivity(true)}>
+              Activity
+            </button>
             <button className="btn btn-secondary btn-sm" onClick={() => { setShowPwForm(f => !f); setPwError(null); setPwSuccess(false) }}>
               {showPwForm ? 'Cancel' : 'Change password'}
             </button>
@@ -474,6 +581,8 @@ export default function AdminDashboard() {
             {pwSuccess && <p style={{ width: '100%', margin: 0, color: 'green', fontSize: '0.875rem' }}>Password updated successfully.</p>}
           </form>
         )}
+
+        {!loading && !error && <StatsBar tickets={tickets} />}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           <div className="filters" style={{ flex: 1, marginBottom: 0 }}>
@@ -567,6 +676,8 @@ export default function AdminDashboard() {
           </>
         )}
       </div>
+
+      {showActivity && <ActivityModal tickets={tickets} onClose={() => setShowActivity(false)} />}
 
       {/* Detail drawer */}
       {selected && editDraft && (

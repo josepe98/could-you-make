@@ -36,6 +36,7 @@ class TicketAdmin(BaseModel):
     status: Status
     submitter_email: Optional[str] = None
     clarifying_notes: Optional[str] = None
+    resolved_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
