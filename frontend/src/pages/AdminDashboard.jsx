@@ -1,5 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  DndContext, DragOverlay,
+  useDroppable, useDraggable,
+  MouseSensor, TouchSensor, useSensor, useSensors,
+  closestCorners,
+} from '@dnd-kit/core'
 import { getAdminTickets, updateTicket, deleteTicket, adminLogout, changePassword } from '../api.js'
 import { useApps } from '../AppsContext.jsx'
 import { useConfirm } from '../ConfirmDialog.jsx'
@@ -37,6 +43,8 @@ const DEFAULT_COL_WIDTHS = {
   actions: 88,
 }
 const COL_WIDTH_STORAGE_KEY = 'cym.adminColWidths.v1'
+const VIEW_STORAGE_KEY = 'cym.adminView.v1'
+const KANBAN_COLUMNS = ['Open', 'In Progress', 'Done', "Won't Fix"]
 
 function loadColWidths() {
   if (typeof window === 'undefined') return DEFAULT_COL_WIDTHS
@@ -47,6 +55,10 @@ function loadColWidths() {
   } catch {
     return DEFAULT_COL_WIDTHS
   }
+}
+
+function loadView() {
+  try { return window.localStorage.getItem(VIEW_STORAGE_KEY) || 'table' } catch { return 'table' }
 }
 
 function ResizeHandle({ onMouseDown }) {
@@ -79,6 +91,68 @@ function SortHeader({ label, field, sortBy, sortDir, onSort, onResize }) {
   )
 }
 
+// ── Kanban components ────────────────────────────────────────────────────────
+
+function KanbanCard({ ticket, onOpen, displayId, appLabels, isDragOverlay }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: ticket.id })
+  const style = transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={[
+        'kanban-card',
+        isDragging ? 'kanban-card--dragging' : '',
+        isDragOverlay ? 'kanban-card--overlay' : '',
+      ].filter(Boolean).join(' ')}
+      {...attributes}
+      {...listeners}
+      onClick={() => onOpen(ticket)}
+    >
+      <div className="kanban-card-header">
+        <code className="kanban-card-id">{displayId(ticket)}</code>
+        <span className={`badge ${PRIORITY_BADGE[ticket.submitter_urgency] || ''}`}>
+          {ticket.submitter_urgency}
+        </span>
+      </div>
+      <div className="kanban-card-title">{ticket.title}</div>
+      <div className="kanban-card-footer">
+        <span className="kanban-card-app">{appLabels[ticket.app] || ticket.app}</span>
+        <span className="kanban-card-type">{ticket.type}</span>
+      </div>
+    </div>
+  )
+}
+
+function KanbanColumn({ status, tickets, onOpen, displayId, appLabels }) {
+  const { setNodeRef, isOver } = useDroppable({ id: status })
+  return (
+    <div className={`kanban-column${isOver ? ' kanban-column--over' : ''}`}>
+      <div className="kanban-column-header">
+        <span className={`badge ${STATUS_BADGE[status] || ''}`}>{status}</span>
+        <span className="kanban-column-count">{tickets.length}</span>
+      </div>
+      <div ref={setNodeRef} className="kanban-column-body">
+        {tickets.map(t => (
+          <KanbanCard
+            key={t.id}
+            ticket={t}
+            onOpen={onOpen}
+            displayId={displayId}
+            appLabels={appLabels}
+          />
+        ))}
+        {tickets.length === 0 && (
+          <div className="kanban-column-empty">No tickets</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Main dashboard ───────────────────────────────────────────────────────────
+
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const { apps, appLabels } = useApps()
@@ -93,6 +167,11 @@ export default function AdminDashboard() {
   const [filters, setFilters] = useState({ app: '', type: '', status: '' })
   const [sortBy, setSortBy] = useState('created_at')
   const [sortDir, setSortDir] = useState('desc')
+
+  const [view, setView] = useState(loadView)
+  useEffect(() => {
+    try { window.localStorage.setItem(VIEW_STORAGE_KEY, view) } catch {}
+  }, [view])
 
   const [colWidths, setColWidths] = useState(loadColWidths)
   useEffect(() => {
@@ -116,6 +195,26 @@ export default function AdminDashboard() {
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
   }, [colWidths])
+
+  // Drag-and-drop sensors: require 8px movement before activating so
+  // clicking a card still opens the detail drawer.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+  )
+  const [activeTicket, setActiveTicket] = useState(null)
+
+  function handleDragStart({ active }) {
+    setActiveTicket(tickets.find(t => t.id === active.id) || null)
+  }
+
+  function handleDragEnd({ active, over }) {
+    setActiveTicket(null)
+    if (!over) return
+    const ticket = tickets.find(t => t.id === active.id)
+    if (!ticket || ticket.status === over.id) return
+    handleInlineChange(ticket, 'status', over.id)
+  }
 
   const [showPwForm, setShowPwForm] = useState(false)
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
@@ -163,9 +262,7 @@ export default function AdminDashboard() {
         typeof document !== 'undefined' &&
         typeof document.startViewTransition === 'function'
       if (crossed) {
-        document.startViewTransition(() => {
-          apply()
-        })
+        document.startViewTransition(() => { apply() })
       } else {
         apply()
       }
@@ -378,30 +475,82 @@ export default function AdminDashboard() {
           </form>
         )}
 
-        <div className="filters" style={{ marginBottom: 16 }}>
-          <select value={filters.app} onChange={e => setFilter('app', e.target.value)}>
-            <option value="">All apps</option>
-            {apps.map(a => <option key={a.slug} value={a.slug}>{a.label}</option>)}
-          </select>
-          <select value={filters.type} onChange={e => setFilter('type', e.target.value)}>
-            <option value="">All types</option>
-            <option>Bug</option>
-            <option>Enhancement</option>
-            <option>Question</option>
-          </select>
-          <select value={filters.status} onChange={e => setFilter('status', e.target.value)}>
-            <option value="">All statuses</option>
-            <option>Open</option>
-            <option value="In Progress">In Progress</option>
-            <option>Done</option>
-            <option value="Won't Fix">Won't Fix</option>
-          </select>
-          <button className="btn btn-secondary btn-sm" onClick={load}>Refresh</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div className="filters" style={{ flex: 1, marginBottom: 0 }}>
+            <select value={filters.app} onChange={e => setFilter('app', e.target.value)}>
+              <option value="">All apps</option>
+              {apps.map(a => <option key={a.slug} value={a.slug}>{a.label}</option>)}
+            </select>
+            <select value={filters.type} onChange={e => setFilter('type', e.target.value)}>
+              <option value="">All types</option>
+              <option>Bug</option>
+              <option>Enhancement</option>
+              <option>Question</option>
+            </select>
+            <select value={filters.status} onChange={e => setFilter('status', e.target.value)}>
+              <option value="">All statuses</option>
+              <option>Open</option>
+              <option value="In Progress">In Progress</option>
+              <option>Done</option>
+              <option value="Won't Fix">Won't Fix</option>
+            </select>
+            <button className="btn btn-secondary btn-sm" onClick={load}>Refresh</button>
+          </div>
+          <div className="view-toggle">
+            <button
+              className={`btn btn-sm${view === 'table' ? ' btn-primary' : ' btn-secondary'}`}
+              onClick={() => setView('table')}
+              title="Table view"
+            >
+              ☰ Table
+            </button>
+            <button
+              className={`btn btn-sm${view === 'kanban' ? ' btn-primary' : ' btn-secondary'}`}
+              onClick={() => setView('kanban')}
+              title="Board view"
+            >
+              ⊞ Board
+            </button>
+          </div>
         </div>
 
         {loading && <p className="loading">Loading tickets…</p>}
         {error && <p className="error">{error}</p>}
-        {!loading && !error && (
+
+        {!loading && !error && view === 'kanban' && (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="kanban-board">
+              {KANBAN_COLUMNS.map(status => (
+                <KanbanColumn
+                  key={status}
+                  status={status}
+                  tickets={tickets.filter(t => t.status === status)}
+                  onOpen={openDetail}
+                  displayId={displayId}
+                  appLabels={appLabels}
+                />
+              ))}
+            </div>
+            <DragOverlay>
+              {activeTicket && (
+                <KanbanCard
+                  ticket={activeTicket}
+                  onOpen={() => {}}
+                  displayId={displayId}
+                  appLabels={appLabels}
+                  isDragOverlay
+                />
+              )}
+            </DragOverlay>
+          </DndContext>
+        )}
+
+        {!loading && !error && view === 'table' && (
           <>
             <h2 style={{ fontSize: '1rem', marginTop: 0, marginBottom: 8, color: 'var(--text-muted)' }}>
               In Progress · {inProgressTickets.length}
