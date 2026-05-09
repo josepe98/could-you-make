@@ -175,13 +175,16 @@ function ActivityModal({ tickets, onClose }) {
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
             <Tooltip />
-            <Legend
-              wrapperStyle={{ fontSize: 13 }}
-              payload={[
-                { value: 'Closed', type: 'square', color: '#16a34a' },
-                { value: 'Opened', type: 'square', color: '#2563eb' },
-              ]}
-            />
+            <Legend content={() => (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 20, fontSize: 13, paddingTop: 8 }}>
+                {[['#2563eb', 'Opened'], ['#16a34a', 'Closed']].map(([color, label]) => (
+                  <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ display: 'inline-block', width: 12, height: 12, background: color, borderRadius: 2 }} />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            )} />
             <Bar dataKey="opened" name="Opened" fill="#2563eb" radius={[3,3,0,0]} />
             <Bar dataKey="closed" name="Closed" fill="#16a34a" radius={[3,3,0,0]} />
           </BarChart>
