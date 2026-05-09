@@ -178,8 +178,8 @@ function ActivityModal({ tickets, onClose }) {
             <Legend
               wrapperStyle={{ fontSize: 13 }}
               payload={[
-                { value: 'Opened', type: 'square', color: '#2563eb' },
                 { value: 'Closed', type: 'square', color: '#16a34a' },
+                { value: 'Opened', type: 'square', color: '#2563eb' },
               ]}
             />
             <Bar dataKey="opened" name="Opened" fill="#2563eb" radius={[3,3,0,0]} />
