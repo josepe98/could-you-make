@@ -175,7 +175,13 @@ function ActivityModal({ tickets, onClose }) {
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
             <Tooltip />
-            <Legend wrapperStyle={{ fontSize: 13 }} />
+            <Legend
+              wrapperStyle={{ fontSize: 13 }}
+              payload={[
+                { value: 'Opened', type: 'square', color: 'var(--accent)' },
+                { value: 'Closed', type: 'square', color: 'var(--success)' },
+              ]}
+            />
             <Bar dataKey="opened" name="Opened" fill="var(--accent)" radius={[3,3,0,0]} />
             <Bar dataKey="closed" name="Closed" fill="var(--success)" radius={[3,3,0,0]} />
           </BarChart>

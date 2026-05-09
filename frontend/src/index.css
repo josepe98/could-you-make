@@ -258,7 +258,7 @@ td select {
 }
 
 .activity-modal {
-  width: 720px;
+  width: 1080px;
   max-width: calc(100vw - 40px);
 }
 
