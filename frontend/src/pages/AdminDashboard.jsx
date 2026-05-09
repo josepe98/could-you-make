@@ -91,6 +91,48 @@ function SortHeader({ label, field, sortBy, sortDir, onSort, onResize }) {
   )
 }
 
+// ── Stats bar ────────────────────────────────────────────────────────────────
+
+function StatsBar({ tickets }) {
+  const now = Date.now()
+  const oneWeekMs = 7 * 24 * 60 * 60 * 1000
+  const oneWeekAgo = now - oneWeekMs
+  const twoWeeksAgo = now - 2 * oneWeekMs
+
+  const count = status => tickets.filter(t => t.status === status).length
+  const thisWeek = tickets.filter(t => new Date(t.created_at).getTime() >= oneWeekAgo).length
+  const lastWeek = tickets.filter(t => {
+    const ms = new Date(t.created_at).getTime()
+    return ms >= twoWeeksAgo && ms < oneWeekAgo
+  }).length
+  const delta = thisWeek - lastWeek
+
+  const stats = [
+    { label: 'Total', value: tickets.length },
+    { label: 'Open', value: count('Open') },
+    { label: 'In Progress', value: count('In Progress') },
+    { label: 'Done', value: count('Done') },
+    { label: "Won't Fix", value: count("Won't Fix") },
+    { label: 'This week', value: thisWeek, delta },
+  ]
+
+  return (
+    <div className="stats-bar">
+      {stats.map(s => (
+        <div key={s.label} className="stats-card">
+          <span className="stats-value">{s.value}</span>
+          <span className="stats-label">{s.label}</span>
+          {s.delta != null && s.delta !== 0 && (
+            <span className={`stats-trend stats-trend--${s.delta > 0 ? 'up' : 'down'}`}>
+              {s.delta > 0 ? `+${s.delta}` : s.delta} vs last wk
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Kanban components ────────────────────────────────────────────────────────
 
 function KanbanCard({ ticket, onOpen, displayId, appLabels, isDragOverlay }) {
@@ -474,6 +516,8 @@ export default function AdminDashboard() {
             {pwSuccess && <p style={{ width: '100%', margin: 0, color: 'green', fontSize: '0.875rem' }}>Password updated successfully.</p>}
           </form>
         )}
+
+        {!loading && !error && <StatsBar tickets={tickets} />}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           <div className="filters" style={{ flex: 1, marginBottom: 0 }}>
