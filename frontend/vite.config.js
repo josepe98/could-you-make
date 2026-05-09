@@ -9,7 +9,7 @@ export default defineConfig({
   server: {
     port: 5175,
     proxy: {
-      '/api': 'http://localhost:8001'
+      '/api': { target: 'https://could-you-make-staging.up.railway.app', changeOrigin: true, secure: true }
     }
   }
 })
