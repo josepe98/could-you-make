@@ -59,6 +59,7 @@ Frontend pages fetch `/api/apps` via `AppsContext` on mount; there are no hardco
 | `submitter_email` | String | Optional; used only for confirmation email |
 | `created_at` | Timestamp | Set on creation |
 | `updated_at` | Timestamp | Updated on any change |
+| `resolved_at` | Timestamp | Set when status transitions to Done or Won't Fix; cleared on reopen |
 
 ---
 
@@ -93,12 +94,9 @@ Frontend pages fetch `/api/apps` via `AppsContext` on mount; there are no hardco
 - Session persisted via a secure HTTP-only cookie (7-day expiry); sessions stored in DB and survive restarts
 - Expired sessions are cleaned up on each login
 - **Ticket list view:**
-  - Split into two tables: **Active** (any status other than Done) on top, **Done** below. Rows animate between the two tables via the View Transitions API when status is toggled across the Done boundary.
-  - Columns: ID, App, Type, Title, Urgency (submitter), Priority (admin, inline — currently hidden via `SHOW_PRIORITY_COLUMN` flag in `AdminDashboard.jsx`), Status (inline), Date
-  - Column widths are user-resizable (drag the column edge); widths persist per browser via `localStorage`
-  - Sortable by: Date, Urgency, Priority, Status
-  - Filterable by: App, Type, Status
-  - Title column wraps (not truncated)
+  - Two view modes: **Table** and **Board**. View preference persists per browser.
+  - **Table mode:** Split into two tables: **Active** (any status other than Done) on top, **Done** below. Rows animate between the two tables via the View Transitions API when status is toggled across the Done boundary. Columns: ID, App, Type, Title, Urgency (submitter), Priority (admin, inline — currently hidden via `SHOW_PRIORITY_COLUMN` flag in `AdminDashboard.jsx`), Status (inline), Date. Column widths are user-resizable (drag the column edge); widths persist per browser via `localStorage`. Sortable by: Date, Urgency, Priority, Status. Filterable by: App, Type, Status. Title column wraps (not truncated).
+  - **Board mode:** Kanban-style view with columns for each status (Open, In Progress, Done, Won't Fix). Cards can be dragged between columns to change status. Filterable by: App, Type.
 - **Ticket detail drawer** (click any row):
   - Full description
   - All fields editable: title, type, description, clarifying_notes, priority, status
@@ -108,6 +106,9 @@ Frontend pages fetch `/api/apps` via `AppsContext` on mount; there are no hardco
   - Requires current password, new password, confirmation
   - Minimum 8 characters enforced both client- and server-side
   - Persisted to DB; takes effect immediately
+- **Activity chart** (modal, triggered from dashboard header):
+  - Bar chart showing tickets opened and closed per week over the last 12 weeks
+  - Built from `resolved_at` timestamps; computed client-side from already-loaded tickets
 
 ---
 

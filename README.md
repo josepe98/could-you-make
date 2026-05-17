@@ -15,9 +15,10 @@ You run one instance of Could You Make and point each of your apps at it. Each a
 - They never see anyone else's tickets — status pages are reachable only via a 256-bit random token that's emailed and shown once on submission
 
 **For you (the admin):**
-- One dashboard at `/admin` shows every ticket from every app in a single sortable, filterable table
-- Active and Done tickets render in separate tables; rows animate between them as you triage
-- Inline status editing, drag-to-resize columns (persisted per browser)
+- One dashboard at `/admin` shows every ticket from every app
+- Two view modes: table (sortable/filterable, with separate Active/Done sections) and kanban board (drag cards between status columns)
+- Inline status editing, drag-to-resize columns in table mode (persisted per browser)
+- Activity chart showing tickets opened and closed per week over the last 12 weeks
 - Per-app ticket ID prefixes (e.g. `BLOG-001`, `STORE-014`) so you can reference tickets unambiguously
 - Optional confirmation emails to submitters via Resend
 
