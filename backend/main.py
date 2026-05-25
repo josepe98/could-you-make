@@ -2,7 +2,7 @@ import secrets
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from pathlib import Path
 from sqlalchemy import text
@@ -165,6 +165,15 @@ if frontend_dist.exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/.well-known/security.txt", include_in_schema=False)
+    async def security_txt():
+        content = (
+            "Contact: mailto:viatenebrosa@yahoo.co.uk\n"
+            "Expires: 2027-05-24T00:00:00.000Z\n"
+            "Preferred-Languages: en\n"
+        )
+        return PlainTextResponse(content)
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_frontend(full_path: str):
