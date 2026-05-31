@@ -13,3 +13,7 @@ frontend/dist/
 
 # OS
 .DS_Store
+
+# Local env files — never commit (ADM-041)
+.env.local
+.env.*.local
