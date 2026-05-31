@@ -147,6 +147,7 @@ If you put Cloudflare (or any reverse proxy) in front, the rate limiter needs to
 - Public status URLs use 256-bit random tokens, not sequential IDs
 - Rate limiting: 2/min ticket creation, 30/min status lookup, 10/min admin login (per real client IP)
 - Security headers middleware: HSTS, CSP, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, Permissions-Policy
+- RFC 9116 `/.well-known/security.txt` endpoint for vulnerability disclosure
 - API docs (`/docs`, `/redoc`, `/openapi.json`) disabled in production
 - `Cache-Control: no-store` on all non-static responses
 
