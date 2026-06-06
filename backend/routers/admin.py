@@ -203,6 +203,25 @@ def update_ticket(
         status_value = (
             new_status.value if hasattr(new_status, "value") else new_status
         )
+        # Load the thread now so the background task gets a plain payload
+        # and doesn't need its own DB session. Description + thread is what
+        # the submitter expects to see in the resolution email; internal
+        # clarifying_notes (AI draft + admin scratchpad) is deliberately
+        # left out.
+        thread_rows = (
+            db.query(TicketMessage)
+            .filter(TicketMessage.ticket_id == ticket.id)
+            .order_by(TicketMessage.created_at.asc())
+            .all()
+        )
+        thread_payload = [
+            {
+                "direction": m.direction,
+                "body": m.body,
+                "created_at": m.created_at,
+            }
+            for m in thread_rows
+        ]
         background_tasks.add_task(
             _send_status_safe,
             to_email=ticket.submitter_email,
@@ -210,7 +229,9 @@ def update_ticket(
             lookup_token=ticket.lookup_token,
             title=ticket.title,
             status=status_value,
-            clarifying_notes=ticket.clarifying_notes,
+            description=ticket.description,
+            submitted_at=ticket.created_at,
+            thread=thread_payload,
         )
     return ticket
 
