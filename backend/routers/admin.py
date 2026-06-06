@@ -118,7 +118,8 @@ def list_tickets(
         query = query.filter(Ticket.type == type)
     if status:
         query = query.filter(Ticket.status == status)
-    sort_col = getattr(Ticket, sort_by, Ticket.created_at)
+    _SORT_COLS = {"created_at", "updated_at", "status", "admin_priority", "submitter_urgency", "type", "app"}
+    sort_col = getattr(Ticket, sort_by if sort_by in _SORT_COLS else "created_at")
     if sort_dir == "asc":
         query = query.order_by(asc(sort_col))
     else:

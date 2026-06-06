@@ -5,10 +5,10 @@ from .models import TicketType, Urgency, Priority, Status
 
 
 class TicketCreate(BaseModel):
-    app: str
+    app: Annotated[str, Field(max_length=64)]
     type: TicketType
-    title: str
-    description: str
+    title: Annotated[str, Field(min_length=1, max_length=255)]
+    description: Annotated[str, Field(min_length=1, max_length=10_000)]
     submitter_urgency: Urgency
     submitter_email: Optional[EmailStr] = None
 
@@ -47,8 +47,8 @@ class TicketUpdate(BaseModel):
     admin_priority: Optional[Priority] = None
     status: Optional[Status] = None
     type: Optional[TicketType] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
+    title: Optional[Annotated[str, Field(min_length=1, max_length=255)]] = None
+    description: Optional[Annotated[str, Field(min_length=1, max_length=10_000)]] = None
     clarifying_notes: Optional[str] = None
 
 
