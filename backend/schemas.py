@@ -54,8 +54,17 @@ class TicketUpdate(BaseModel):
     clarifying_notes: Optional[str] = None
 
 
-class AskSubmitter(BaseModel):
-    question: Annotated[str, Field(min_length=1, max_length=4_000)]
+class TicketMessageCreate(BaseModel):
+    body: Annotated[str, Field(min_length=1, max_length=10_000)]
+
+
+class TicketMessageOut(BaseModel):
+    id: int
+    direction: str
+    body: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class AdminLogin(BaseModel):

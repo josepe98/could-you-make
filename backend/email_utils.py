@@ -183,45 +183,49 @@ View the full ticket: {ticket_url}
     await _send_via_resend(payload, display_id, "status email")
 
 
-async def send_question_email(
+async def send_message_email(
     to_email: str,
     display_id: str,
     lookup_token: str,
     title: str,
-    question: str,
+    message_body: str,
 ):
-    """Admin "ask the submitter a question" flow. Replies go to REPLY_TO
-    (the configured Fastmail inbox) — manual threading at current volume."""
+    """Notify the submitter that the admin posted a message on their ticket.
+    The email surfaces the message inline so the submitter can read it
+    without clicking, then directs them to the in-app reply page.
+    Replies happen in CYM, not via email reply — REPLY_TO is preserved for
+    submitters who reply anyway, but the canonical channel is the link."""
     if not settings.RESEND_API_KEY or not settings.FROM_EMAIL:
-        log.warning("Email not configured — skipping question email for %s to %s", display_id, to_email)
+        log.warning("Email not configured — skipping message email for %s to %s", display_id, to_email)
         return
 
-    ticket_url = f"{settings.BASE_URL}/ticket/{lookup_token}"
+    reply_url = f"{settings.BASE_URL}/ticket/{lookup_token}"
 
     text_body = f"""Hi,
 
-We have a question about your ticket {display_id} ("{title}"):
+We have a message for you about your ticket {display_id} ("{title}"):
 
-{question}
+{message_body}
 
-You can reply directly to this email, or view the ticket here:
-{ticket_url}
+Reply in CYM (this keeps the conversation attached to your ticket):
+{reply_url}
 """
     html_body = f"""<html><body style="font-family:sans-serif;color:#1a1a18;max-width:560px;margin:32px auto;padding:0 16px">
-<h2 style="color:#2563eb">Question about ticket {display_id}</h2>
-<p>We have a question about your request <strong>"{title}"</strong>:</p>
-<blockquote style="margin:16px 0;padding:12px 16px;border-left:4px solid #2563eb;background:#f6f6f3;white-space:pre-wrap;font-size:14px">{question}</blockquote>
-<p style="color:#6b6b65;font-size:13px">Reply directly to this email, or <a href="{ticket_url}" style="color:#2563eb">view the ticket</a>.</p>
+<h2 style="color:#2563eb">New message on ticket {display_id}</h2>
+<p>We have a message for you about your request <strong>"{title}"</strong>:</p>
+<blockquote style="margin:16px 0;padding:12px 16px;border-left:4px solid #2563eb;background:#f6f6f3;white-space:pre-wrap;font-size:14px">{message_body}</blockquote>
+<p><a href="{reply_url}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600">View &amp; reply &rarr;</a></p>
+<p style="color:#6b6b65;font-size:13px">Replying in CYM keeps the conversation attached to your ticket — much easier for both of us to keep track than email back-and-forth.</p>
 </body></html>"""
 
     payload = {
         "from": _from_header(),
         "to": [to_email],
-        "subject": f"Question about your ticket {display_id}",
+        "subject": f"New message on your ticket {display_id}",
         "html": html_body,
         "text": text_body,
     }
     if settings.REPLY_TO:
         payload["reply_to"] = settings.REPLY_TO
 
-    await _send_via_resend(payload, display_id, "question email")
+    await _send_via_resend(payload, display_id, "message email")

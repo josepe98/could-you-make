@@ -6,11 +6,14 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy import asc, desc
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import Ticket, AdminPassword, AdminSession
-from ..schemas import TicketAdmin, TicketUpdate, AdminLogin, ChangePassword, AskSubmitter
+from ..models import Ticket, TicketMessage, AdminPassword, AdminSession
+from ..schemas import (
+    TicketAdmin, TicketUpdate, AdminLogin, ChangePassword,
+    TicketMessageCreate, TicketMessageOut,
+)
 from ..config import settings
 from ..auth import hash_password, verify_password
-from ..email_utils import send_status_email, send_question_email
+from ..email_utils import send_status_email, send_message_email
 from ..limiter import limiter
 
 log = logging.getLogger("cym.admin")
@@ -151,11 +154,11 @@ async def _send_status_safe(**kwargs):
         log.error("Failed to send status email: %s", e, exc_info=True)
 
 
-async def _send_question_safe(**kwargs):
+async def _send_message_safe(**kwargs):
     try:
-        await send_question_email(**kwargs)
+        await send_message_email(**kwargs)
     except Exception as e:
-        log.error("Failed to send question email: %s", e, exc_info=True)
+        log.error("Failed to send message email: %s", e, exc_info=True)
 
 
 @router.patch("/tickets/{ticket_id}", response_model=TicketAdmin)
@@ -212,33 +215,62 @@ def update_ticket(
     return ticket
 
 
-@router.post("/tickets/{ticket_id}/ask")
-def ask_submitter(
+@router.get("/tickets/{ticket_id}/messages", response_model=list[TicketMessageOut])
+def list_ticket_messages(
     ticket_id: int,
-    payload: AskSubmitter,
+    db: Session = Depends(get_db),
+    _auth: str = Depends(require_auth_or_api_key),
+):
+    """List the message thread for a ticket. Returns oldest-first so the
+    drawer can render top-to-bottom like a chat."""
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return (
+        db.query(TicketMessage)
+        .filter(TicketMessage.ticket_id == ticket_id)
+        .order_by(TicketMessage.created_at.asc())
+        .all()
+    )
+
+
+@router.post("/tickets/{ticket_id}/messages", response_model=TicketMessageOut)
+def create_ticket_message(
+    ticket_id: int,
+    payload: TicketMessageCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _auth: str = Depends(require_auth_or_api_key),
 ):
-    """Send the submitter a question about their ticket. Replies route to
-    REPLY_TO (the configured Fastmail inbox) — manual threading."""
+    """Admin posts a message to the submitter. Stored in ticket_messages,
+    then emailed via Resend with a link to the in-app reply page. The
+    submitter responds at /ticket/{lookup_token}, not by email reply."""
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     if not ticket.submitter_email:
         raise HTTPException(
             status_code=400,
-            detail="Ticket has no submitter_email — cannot send a question.",
+            detail="Ticket has no submitter_email — cannot send a message.",
         )
+    msg = TicketMessage(
+        ticket_id=ticket.id,
+        direction="admin",
+        body=payload.body,
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+
     background_tasks.add_task(
-        _send_question_safe,
+        _send_message_safe,
         to_email=ticket.submitter_email,
         display_id=ticket.display_id,
         lookup_token=ticket.lookup_token,
         title=ticket.title,
-        question=payload.question,
+        message_body=payload.body,
     )
-    return {"message": f"Question queued for {ticket.display_id}"}
+    return msg
 
 
 @router.delete("/tickets/{ticket_id}")

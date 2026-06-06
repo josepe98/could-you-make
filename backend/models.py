@@ -122,6 +122,29 @@ class Ticket(Base):
         return f"{self.app_obj.prefix}-{self.id:03d}"
 
 
+class TicketMessage(Base):
+    """One message in a ticket's clarification thread. `direction` is
+    `admin` (sent by the admin from the dashboard) or `submitter` (posted
+    by the submitter on the public /ticket/{lookup_token} reply page).
+    Auth-free for submitters: the lookup_token on the ticket is the bearer.
+    """
+    __tablename__ = "ticket_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    ticket_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("tickets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    direction: Mapped[str] = mapped_column(String(16), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 class AdminPassword(Base):
     __tablename__ = "admin_password"
 

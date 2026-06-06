@@ -7,7 +7,7 @@ import {
   MouseSensor, TouchSensor, useSensor, useSensors,
   closestCorners,
 } from '@dnd-kit/core'
-import { getAdminTickets, updateTicket, deleteTicket, askSubmitter, adminLogout, changePassword } from '../api.js'
+import { getAdminTickets, updateTicket, deleteTicket, getAdminMessages, sendAdminMessage, adminLogout, changePassword } from '../api.js'
 import { useApps } from '../AppsContext.jsx'
 import { useConfirm } from '../ConfirmDialog.jsx'
 
@@ -266,11 +266,11 @@ export default function AdminDashboard() {
   const [selected, setSelected] = useState(null)
   const [editDraft, setEditDraft] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [askingTicket, setAskingTicket] = useState(null)
-  const [askQuestion, setAskQuestion] = useState('')
-  const [askSending, setAskSending] = useState(false)
-  const [askError, setAskError] = useState(null)
-  const [askSuccess, setAskSuccess] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [messagesLoading, setMessagesLoading] = useState(false)
+  const [composer, setComposer] = useState('')
+  const [composerSending, setComposerSending] = useState(false)
+  const [composerError, setComposerError] = useState(null)
 
   const [filters, setFilters] = useState({ app: '', type: '', status: '' })
   const [sortBy, setSortBy] = useState('created_at')
@@ -383,6 +383,30 @@ export default function AdminDashboard() {
   function openDetail(ticket) {
     setSelected(ticket)
     setEditDraft({ ...ticket })
+    setMessages([])
+    setComposer('')
+    setComposerError(null)
+    setMessagesLoading(true)
+    getAdminMessages(ticket.id)
+      .then(setMessages)
+      .catch(e => setComposerError(e.message))
+      .finally(() => setMessagesLoading(false))
+  }
+
+  async function sendComposerMessage() {
+    const body = composer.trim()
+    if (!body || !selected) return
+    setComposerSending(true)
+    setComposerError(null)
+    try {
+      const msg = await sendAdminMessage(selected.id, body)
+      setMessages(ms => [...ms, msg])
+      setComposer('')
+    } catch (e) {
+      setComposerError(e.message)
+    } finally {
+      setComposerSending(false)
+    }
   }
 
   async function saveDetail() {
@@ -420,31 +444,6 @@ export default function AdminDashboard() {
       if (selected?.id === ticket.id) setSelected(null)
     } catch (e) {
       alert('Failed to delete: ' + e.message)
-    }
-  }
-
-  function openAskModal(ticket) {
-    setAskingTicket(ticket)
-    setAskQuestion('')
-    setAskError(null)
-    setAskSuccess(false)
-  }
-
-  async function sendAskQuestion() {
-    if (!askQuestion.trim()) return
-    setAskSending(true)
-    setAskError(null)
-    try {
-      await askSubmitter(askingTicket.id, askQuestion.trim())
-      setAskSuccess(true)
-      setTimeout(() => {
-        setAskingTicket(null)
-        setAskSuccess(false)
-      }, 1500)
-    } catch (e) {
-      setAskError(e.message)
-    } finally {
-      setAskSending(false)
     }
   }
 
@@ -797,60 +796,71 @@ export default function AdminDashboard() {
               <dt>Updated</dt><dd>{new Date(selected.updated_at).toLocaleString()}</dd>
             </dl>
 
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Conversation</label>
+              {messagesLoading && (
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Loading…</p>
+              )}
+              {!messagesLoading && messages.length === 0 && (
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', fontStyle: 'italic' }}>
+                  No messages yet.
+                </p>
+              )}
+              {messages.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                  {messages.map(m => (
+                    <div
+                      key={m.id}
+                      style={{
+                        background: m.direction === 'admin' ? '#e8f0fe' : '#f6f6f3',
+                        borderLeft: `3px solid ${m.direction === 'admin' ? '#2563eb' : '#6b6b65'}`,
+                        padding: '8px 12px',
+                        borderRadius: 4,
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        {m.direction === 'admin' ? 'You' : (selected.submitter_email || 'Submitter')}
+                        {' · '}
+                        {new Date(m.created_at).toLocaleString()}
+                      </div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{m.body}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {selected.submitter_email ? (
+                <>
+                  <textarea
+                    value={composer}
+                    onChange={e => setComposer(e.target.value)}
+                    placeholder="Send a message — they'll get an email with a link to reply in-app."
+                    style={{ width: '100%', minHeight: 80 }}
+                    disabled={composerSending}
+                  />
+                  {composerError && <p className="error" style={{ marginTop: 4 }}>{composerError}</p>}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={sendComposerMessage}
+                      disabled={composerSending || !composer.trim()}
+                    >
+                      {composerSending ? 'Sending…' : 'Send message'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', fontStyle: 'italic' }}>
+                  Submitter has no email on file — can't send a message.
+                </p>
+              )}
+            </div>
+
             <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 16, flexWrap: 'wrap' }}>
               <button className="btn btn-primary" onClick={saveDetail} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
               <button className="btn btn-secondary" onClick={() => setSelected(null)}>Cancel</button>
-              {selected.submitter_email && (
-                <button className="btn btn-secondary btn-sm" onClick={() => openAskModal(selected)}>
-                  Ask submitter…
-                </button>
-              )}
               <button className="btn btn-danger btn-sm" style={{ marginLeft: 'auto' }} onClick={() => handleDelete(selected)}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {askingTicket && (
-        <div className="drawer-overlay" onClick={() => !askSending && setAskingTicket(null)}>
-          <div
-            className="card"
-            onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 480, margin: '10vh auto', padding: 24 }}
-          >
-            <h3 style={{ marginTop: 0 }}>Ask the submitter</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-              Sending to <strong>{askingTicket.submitter_email}</strong> about{' '}
-              <code>{displayId(askingTicket)}</code> — "{askingTicket.title}".
-              Replies will go to your configured inbox.
-            </p>
-            <div className="form-group">
-              <label>Question</label>
-              <textarea
-                value={askQuestion}
-                onChange={e => setAskQuestion(e.target.value)}
-                placeholder="What clarification do you need?"
-                style={{ minHeight: 120 }}
-                disabled={askSending || askSuccess}
-              />
-            </div>
-            {askError && <p className="error">{askError}</p>}
-            {askSuccess && <p style={{ color: 'var(--success, #2a8c3d)' }}>Sent ✓</p>}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-              <button
-                className="btn btn-secondary"
-                onClick={() => setAskingTicket(null)}
-                disabled={askSending}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={sendAskQuestion}
-                disabled={askSending || askSuccess || !askQuestion.trim()}
-              >
-                {askSending ? 'Sending…' : 'Send'}
-              </button>
             </div>
           </div>
         </div>
