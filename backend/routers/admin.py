@@ -185,7 +185,14 @@ def update_ticket(
         if transitioning_to_closed:
             ticket.resolved_at = datetime.now(timezone.utc)
         elif new_status not in CLOSED_STATUSES:
+            # Reopen: clear resolved_at AND closed_notified_at so a
+            # subsequent re-close registers as a fresh resolution event
+            # and re-notifies the submitter. The dual-send protection we
+            # actually need (don't re-fire if status is patched twice
+            # without a reopen in between) comes from transitioning_to_closed
+            # — the old_status check already prevents that.
             ticket.resolved_at = None
+            ticket.closed_notified_at = None
     # Status-change email: fire once per ticket on the first transition into
     # a closed status. closed_notified_at is the idempotency gate — reopen →
     # re-close never re-emails. Require submitter_email; legacy tickets
