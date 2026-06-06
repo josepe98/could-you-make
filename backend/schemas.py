@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Optional
 from pydantic import BaseModel, EmailStr, Field
-from .models import TicketType, Urgency, Priority, Status
+from .models import TicketType, Urgency, Priority, Status, LevelOfEffort
 
 
 class TicketCreate(BaseModel):
@@ -10,7 +10,7 @@ class TicketCreate(BaseModel):
     title: Annotated[str, Field(min_length=1, max_length=255)]
     description: Annotated[str, Field(min_length=1, max_length=10_000)]
     submitter_urgency: Urgency
-    submitter_email: Optional[EmailStr] = None
+    submitter_email: EmailStr
 
 
 class TicketPublic(BaseModel):
@@ -33,6 +33,7 @@ class TicketAdmin(BaseModel):
     description: str
     submitter_urgency: Urgency
     admin_priority: Optional[Priority] = None
+    level_of_effort: Optional[LevelOfEffort] = None
     status: Status
     submitter_email: Optional[str] = None
     clarifying_notes: Optional[str] = None
@@ -45,11 +46,16 @@ class TicketAdmin(BaseModel):
 
 class TicketUpdate(BaseModel):
     admin_priority: Optional[Priority] = None
+    level_of_effort: Optional[LevelOfEffort] = None
     status: Optional[Status] = None
     type: Optional[TicketType] = None
     title: Optional[Annotated[str, Field(min_length=1, max_length=255)]] = None
     description: Optional[Annotated[str, Field(min_length=1, max_length=10_000)]] = None
     clarifying_notes: Optional[str] = None
+
+
+class AskSubmitter(BaseModel):
+    question: Annotated[str, Field(min_length=1, max_length=4_000)]
 
 
 class AdminLogin(BaseModel):

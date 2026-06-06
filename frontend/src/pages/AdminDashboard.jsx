@@ -7,7 +7,7 @@ import {
   MouseSensor, TouchSensor, useSensor, useSensors,
   closestCorners,
 } from '@dnd-kit/core'
-import { getAdminTickets, updateTicket, deleteTicket, adminLogout, changePassword } from '../api.js'
+import { getAdminTickets, updateTicket, deleteTicket, askSubmitter, adminLogout, changePassword } from '../api.js'
 import { useApps } from '../AppsContext.jsx'
 import { useConfirm } from '../ConfirmDialog.jsx'
 
@@ -266,6 +266,11 @@ export default function AdminDashboard() {
   const [selected, setSelected] = useState(null)
   const [editDraft, setEditDraft] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [askingTicket, setAskingTicket] = useState(null)
+  const [askQuestion, setAskQuestion] = useState('')
+  const [askSending, setAskSending] = useState(false)
+  const [askError, setAskError] = useState(null)
+  const [askSuccess, setAskSuccess] = useState(false)
 
   const [filters, setFilters] = useState({ app: '', type: '', status: '' })
   const [sortBy, setSortBy] = useState('created_at')
@@ -388,6 +393,7 @@ export default function AdminDashboard() {
         description: editDraft.description,
         type: editDraft.type,
         admin_priority: editDraft.admin_priority || null,
+        level_of_effort: editDraft.level_of_effort || null,
         status: editDraft.status,
       })
       setTickets(ts => ts.map(t => t.id === updated.id ? updated : t))
@@ -414,6 +420,31 @@ export default function AdminDashboard() {
       if (selected?.id === ticket.id) setSelected(null)
     } catch (e) {
       alert('Failed to delete: ' + e.message)
+    }
+  }
+
+  function openAskModal(ticket) {
+    setAskingTicket(ticket)
+    setAskQuestion('')
+    setAskError(null)
+    setAskSuccess(false)
+  }
+
+  async function sendAskQuestion() {
+    if (!askQuestion.trim()) return
+    setAskSending(true)
+    setAskError(null)
+    try {
+      await askSubmitter(askingTicket.id, askQuestion.trim())
+      setAskSuccess(true)
+      setTimeout(() => {
+        setAskingTicket(null)
+        setAskSuccess(false)
+      }, 1500)
+    } catch (e) {
+      setAskError(e.message)
+    } finally {
+      setAskSending(false)
     }
   }
 
@@ -718,6 +749,17 @@ export default function AdminDashboard() {
               </select>
             </div>
             <div className="form-group">
+              <label>Level of effort</label>
+              <select value={editDraft.level_of_effort || ''} onChange={e => setEditDraft(d => ({ ...d, level_of_effort: e.target.value || null }))}>
+                <option value="">—</option>
+                <option>XS</option>
+                <option>S</option>
+                <option>M</option>
+                <option>L</option>
+                <option>XL</option>
+              </select>
+            </div>
+            <div className="form-group">
               <label>Status</label>
               <select value={editDraft.status} onChange={e => setEditDraft(d => ({ ...d, status: e.target.value }))}>
                 <option>Open</option>
@@ -730,9 +772,20 @@ export default function AdminDashboard() {
             {selected.clarifying_notes && (
               <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
                 <label>Clarifying notes</label>
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.875rem', color: 'var(--text)', background: 'var(--bg-subtle, #f6f6f6)', padding: 12, borderRadius: 6 }}>
-                  {selected.clarifying_notes}
-                </div>
+                {selected.clarifying_notes.includes('[AI draft]') ? (
+                  <div style={{ background: '#fef9e7', border: '1px solid #f0d878', borderRadius: 6, padding: 12 }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#8a6d00', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      AI-drafted — review before trusting
+                    </div>
+                    <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.875rem', color: 'var(--text)' }}>
+                      {selected.clarifying_notes}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.875rem', color: 'var(--text)', background: 'var(--bg-subtle, #f6f6f6)', padding: 12, borderRadius: 6 }}>
+                    {selected.clarifying_notes}
+                  </div>
+                )}
               </div>
             )}
 
@@ -744,10 +797,60 @@ export default function AdminDashboard() {
               <dt>Updated</dt><dd>{new Date(selected.updated_at).toLocaleString()}</dd>
             </dl>
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 16 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 16, flexWrap: 'wrap' }}>
               <button className="btn btn-primary" onClick={saveDetail} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
               <button className="btn btn-secondary" onClick={() => setSelected(null)}>Cancel</button>
+              {selected.submitter_email && (
+                <button className="btn btn-secondary btn-sm" onClick={() => openAskModal(selected)}>
+                  Ask submitter…
+                </button>
+              )}
               <button className="btn btn-danger btn-sm" style={{ marginLeft: 'auto' }} onClick={() => handleDelete(selected)}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {askingTicket && (
+        <div className="drawer-overlay" onClick={() => !askSending && setAskingTicket(null)}>
+          <div
+            className="card"
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: 480, margin: '10vh auto', padding: 24 }}
+          >
+            <h3 style={{ marginTop: 0 }}>Ask the submitter</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+              Sending to <strong>{askingTicket.submitter_email}</strong> about{' '}
+              <code>{displayId(askingTicket)}</code> — "{askingTicket.title}".
+              Replies will go to your configured inbox.
+            </p>
+            <div className="form-group">
+              <label>Question</label>
+              <textarea
+                value={askQuestion}
+                onChange={e => setAskQuestion(e.target.value)}
+                placeholder="What clarification do you need?"
+                style={{ minHeight: 120 }}
+                disabled={askSending || askSuccess}
+              />
+            </div>
+            {askError && <p className="error">{askError}</p>}
+            {askSuccess && <p style={{ color: 'var(--success, #2a8c3d)' }}>Sent ✓</p>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setAskingTicket(null)}
+                disabled={askSending}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={sendAskQuestion}
+                disabled={askSending || askSuccess || !askQuestion.trim()}
+              >
+                {askSending ? 'Sending…' : 'Send'}
+              </button>
             </div>
           </div>
         </div>

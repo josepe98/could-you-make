@@ -54,6 +54,20 @@ export async function updateTicket(id, data) {
   return res.json()
 }
 
+export async function askSubmitter(id, question) {
+  const res = await fetch(`${BASE}/admin/tickets/${id}/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ question }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Failed to send question')
+  }
+  return res.json()
+}
+
 export async function deleteTicket(id) {
   const res = await fetch(`${BASE}/admin/tickets/${id}`, {
     method: 'DELETE',

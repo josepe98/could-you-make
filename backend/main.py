@@ -55,6 +55,20 @@ def _run_ddl_migrations():
             "UPDATE tickets SET resolved_at = updated_at "
             "WHERE status IN ('Done', 'Won''t Fix') AND resolved_at IS NULL"
         ))
+        conn.execute(text(
+            "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS "
+            "level_of_effort VARCHAR(8)"
+        ))
+        # closed_notified_at gates the status-change email so reopen → re-close
+        # doesn't re-notify. Backfill existing Done/Won't Fix rows to resolved_at
+        # so the first deploy doesn't blast emails for already-closed tickets.
+        conn.execute(text(
+            "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS closed_notified_at TIMESTAMPTZ"
+        ))
+        conn.execute(text(
+            "UPDATE tickets SET closed_notified_at = resolved_at "
+            "WHERE status IN ('Done', 'Won''t Fix') AND closed_notified_at IS NULL"
+        ))
 
         # Retire the appname PG enum in favour of a data-driven apps table.
         # We only convert the column here; the FK constraint is added later

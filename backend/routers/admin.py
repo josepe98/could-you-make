@@ -1,15 +1,19 @@
+import logging
 import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from sqlalchemy import asc, desc
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Ticket, AdminPassword, AdminSession
-from ..schemas import TicketAdmin, TicketUpdate, AdminLogin, ChangePassword
+from ..schemas import TicketAdmin, TicketUpdate, AdminLogin, ChangePassword, AskSubmitter
 from ..config import settings
 from ..auth import hash_password, verify_password
+from ..email_utils import send_status_email, send_question_email
 from ..limiter import limiter
+
+log = logging.getLogger("cym.admin")
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -137,9 +141,31 @@ def get_ticket_admin(ticket_id: int, db: Session = Depends(get_db), _auth: str =
 
 CLOSED_STATUSES = {"Done", "Won't Fix"}
 
+
+async def _send_status_safe(**kwargs):
+    """Wrap send_status_email so background-task failures are logged
+    instead of crashing the worker."""
+    try:
+        await send_status_email(**kwargs)
+    except Exception as e:
+        log.error("Failed to send status email: %s", e, exc_info=True)
+
+
+async def _send_question_safe(**kwargs):
+    try:
+        await send_question_email(**kwargs)
+    except Exception as e:
+        log.error("Failed to send question email: %s", e, exc_info=True)
+
+
 @router.patch("/tickets/{ticket_id}", response_model=TicketAdmin)
-def update_ticket(ticket_id: int, update: TicketUpdate, db: Session = Depends(get_db), _auth: str = Depends(require_auth_or_api_key)):
-    from datetime import datetime, timezone
+def update_ticket(
+    ticket_id: int,
+    update: TicketUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _auth: str = Depends(require_auth_or_api_key),
+):
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -147,14 +173,72 @@ def update_ticket(ticket_id: int, update: TicketUpdate, db: Session = Depends(ge
     old_status = ticket.status
     for field, value in update.model_dump(exclude_none=True).items():
         setattr(ticket, field, value)
+    transitioning_to_closed = (
+        new_status is not None
+        and new_status in CLOSED_STATUSES
+        and old_status not in CLOSED_STATUSES
+    )
     if new_status is not None:
-        if new_status in CLOSED_STATUSES and old_status not in CLOSED_STATUSES:
+        if transitioning_to_closed:
             ticket.resolved_at = datetime.now(timezone.utc)
         elif new_status not in CLOSED_STATUSES:
             ticket.resolved_at = None
+    # Status-change email: fire once per ticket on the first transition into
+    # a closed status. closed_notified_at is the idempotency gate — reopen →
+    # re-close never re-emails. Require submitter_email; legacy tickets
+    # without one are silently skipped.
+    should_notify = (
+        transitioning_to_closed
+        and ticket.closed_notified_at is None
+        and ticket.submitter_email
+    )
+    if should_notify:
+        ticket.closed_notified_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(ticket)
+    if should_notify:
+        status_value = (
+            new_status.value if hasattr(new_status, "value") else new_status
+        )
+        background_tasks.add_task(
+            _send_status_safe,
+            to_email=ticket.submitter_email,
+            display_id=ticket.display_id,
+            lookup_token=ticket.lookup_token,
+            title=ticket.title,
+            status=status_value,
+            clarifying_notes=ticket.clarifying_notes,
+        )
     return ticket
+
+
+@router.post("/tickets/{ticket_id}/ask")
+def ask_submitter(
+    ticket_id: int,
+    payload: AskSubmitter,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _auth: str = Depends(require_auth_or_api_key),
+):
+    """Send the submitter a question about their ticket. Replies route to
+    REPLY_TO (the configured Fastmail inbox) — manual threading."""
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if not ticket.submitter_email:
+        raise HTTPException(
+            status_code=400,
+            detail="Ticket has no submitter_email — cannot send a question.",
+        )
+    background_tasks.add_task(
+        _send_question_safe,
+        to_email=ticket.submitter_email,
+        display_id=ticket.display_id,
+        lookup_token=ticket.lookup_token,
+        title=ticket.title,
+        question=payload.question,
+    )
+    return {"message": f"Question queued for {ticket.display_id}"}
 
 
 @router.delete("/tickets/{ticket_id}")

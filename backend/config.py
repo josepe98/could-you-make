@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     FROM_NAME: str = ""
     REPLY_TO: str = ""
     BASE_URL: str = "https://couldyoumake.app"
+    # Optional. When set, post-submit ticket enrichment calls the Anthropic
+    # API to draft a plan into clarifying_notes and pick a level_of_effort.
+    # Leave empty to skip enrichment.
+    ANTHROPIC_API_KEY: str = ""
 
     # extra=ignore so stray env vars (old SMTP_*, etc.) don't raise
     # ValidationError on startup.
