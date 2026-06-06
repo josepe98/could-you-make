@@ -19,6 +19,11 @@ class TicketPublic(BaseModel):
     type: TicketType
     app: str
     status: Status
+    # description exposed so the public reply page can show the submitter
+    # what they originally wrote as the anchor of the conversation thread.
+    # Status page is gated by the lookup_token, so this is no broader than
+    # the existing public view already is.
+    description: str
     created_at: datetime
 
     model_config = {"from_attributes": True}

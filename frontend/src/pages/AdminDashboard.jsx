@@ -801,13 +801,25 @@ export default function AdminDashboard() {
               {messagesLoading && (
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Loading…</p>
               )}
-              {!messagesLoading && messages.length === 0 && (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', fontStyle: 'italic' }}>
-                  No messages yet.
-                </p>
-              )}
-              {messages.length > 0 && (
+              {!messagesLoading && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                  {/* Synthetic first entry: the original submission. Matches
+                      the public reply page so the conversation has the same
+                      anchor on both sides. */}
+                  <div
+                    style={{
+                      background: '#f6f6f3',
+                      borderLeft: '3px solid #6b6b65',
+                      padding: '8px 12px',
+                      borderRadius: 4,
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      {selected.submitter_email || 'Submitter'} · Original submission · {new Date(selected.created_at).toLocaleString()}
+                    </div>
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{selected.description}</div>
+                  </div>
                   {messages.map(m => (
                     <div
                       key={m.id}

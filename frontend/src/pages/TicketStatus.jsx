@@ -85,34 +85,44 @@ export default function TicketStatus() {
                   Couldn't load messages: {messagesError}
                 </p>
               )}
-              {!messagesError && messages.length === 0 && (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', fontStyle: 'italic' }}>
-                  No messages yet. Use the form below to send a note about your ticket.
-                </p>
-              )}
-              {messages.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                  {messages.map(m => (
-                    <div
-                      key={m.id}
-                      style={{
-                        background: m.direction === 'admin' ? '#e8f0fe' : '#f6f6f3',
-                        borderLeft: `3px solid ${m.direction === 'admin' ? '#2563eb' : '#6b6b65'}`,
-                        padding: '10px 14px',
-                        borderRadius: 4,
-                        fontSize: '0.9rem',
-                      }}
-                    >
-                      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        {m.direction === 'admin' ? 'Erik' : 'You'}
-                        {' · '}
-                        {new Date(m.created_at).toLocaleString()}
-                      </div>
-                      <div style={{ whiteSpace: 'pre-wrap' }}>{m.body}</div>
-                    </div>
-                  ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                {/* Synthetic first entry: the user's original submission. Not a
+                    real ticket_messages row — built from ticket.description +
+                    ticket.created_at so the conversation has a clear anchor. */}
+                <div
+                  style={{
+                    background: '#f6f6f3',
+                    borderLeft: '3px solid #6b6b65',
+                    padding: '10px 14px',
+                    borderRadius: 4,
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    You · Original submission · {new Date(ticket.created_at).toLocaleString()}
+                  </div>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{ticket.description}</div>
                 </div>
-              )}
+                {messages.map(m => (
+                  <div
+                    key={m.id}
+                    style={{
+                      background: m.direction === 'admin' ? '#e8f0fe' : '#f6f6f3',
+                      borderLeft: `3px solid ${m.direction === 'admin' ? '#2563eb' : '#6b6b65'}`,
+                      padding: '10px 14px',
+                      borderRadius: 4,
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      {m.direction === 'admin' ? 'Erik' : 'You'}
+                      {' · '}
+                      {new Date(m.created_at).toLocaleString()}
+                    </div>
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{m.body}</div>
+                  </div>
+                ))}
+              </div>
 
               <form onSubmit={handleSendReply}>
                 <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: '0.875rem' }}>
