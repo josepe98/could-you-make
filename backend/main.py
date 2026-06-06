@@ -55,6 +55,39 @@ def _run_ddl_migrations():
             "UPDATE tickets SET resolved_at = updated_at "
             "WHERE status IN ('Done', 'Won''t Fix') AND resolved_at IS NULL"
         ))
+        conn.execute(text(
+            "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS "
+            "level_of_effort VARCHAR(8)"
+        ))
+        # closed_notified_at gates the status-change email so reopen → re-close
+        # doesn't re-notify. Backfill existing Done/Won't Fix rows to resolved_at
+        # so the first deploy doesn't blast emails for already-closed tickets.
+        conn.execute(text(
+            "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS closed_notified_at TIMESTAMPTZ"
+        ))
+        conn.execute(text(
+            "UPDATE tickets SET closed_notified_at = resolved_at "
+            "WHERE status IN ('Done', 'Won''t Fix') AND closed_notified_at IS NULL"
+        ))
+
+        # ticket_messages: clarification thread between admin and submitter.
+        # create_all() will add this on a fresh DB; this CREATE IF NOT EXISTS
+        # covers the live Postgres DB that already exists. Index on
+        # (ticket_id, created_at) so the per-ticket thread loads in order
+        # without a table scan.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS ticket_messages (
+                id SERIAL PRIMARY KEY,
+                ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+                direction VARCHAR(16) NOT NULL,
+                body TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ticket_messages_ticket_id_idx "
+            "ON ticket_messages (ticket_id, created_at)"
+        ))
 
         # Retire the appname PG enum in favour of a data-driven apps table.
         # We only convert the column here; the FK constraint is added later

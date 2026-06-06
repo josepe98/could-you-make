@@ -47,6 +47,14 @@ class Status(str, enum.Enum):
     wont_fix = "Won't Fix"
 
 
+class LevelOfEffort(str, enum.Enum):
+    xs = "XS"
+    s = "S"
+    m = "M"
+    l = "L"
+    xl = "XL"
+
+
 def _values(e):
     return [m.value for m in e]
 
@@ -90,7 +98,11 @@ class Ticket(Base):
         default=lambda: secrets.token_urlsafe(32),
     )
     clarifying_notes: Mapped[str] = mapped_column(Text, nullable=True)
+    level_of_effort: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     resolved_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    closed_notified_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -108,6 +120,29 @@ class Ticket(Base):
     @property
     def display_id(self) -> str:
         return f"{self.app_obj.prefix}-{self.id:03d}"
+
+
+class TicketMessage(Base):
+    """One message in a ticket's clarification thread. `direction` is
+    `admin` (sent by the admin from the dashboard) or `submitter` (posted
+    by the submitter on the public /ticket/{lookup_token} reply page).
+    Auth-free for submitters: the lookup_token on the ticket is the bearer.
+    """
+    __tablename__ = "ticket_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    ticket_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("tickets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    direction: Mapped[str] = mapped_column(String(16), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
 
 
 class AdminPassword(Base):

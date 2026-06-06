@@ -27,9 +27,7 @@ export default function Submit() {
     setError(null)
     setSubmitting(true)
     try {
-      const payload = { ...form }
-      if (!payload.submitter_email) delete payload.submitter_email
-      const data = await submitTicket(payload)
+      const data = await submitTicket(form)
       setResult(data)
     } catch (err) {
       setError(err.message)
@@ -123,14 +121,15 @@ export default function Submit() {
           </div>
 
           <div className="form-group">
-            <label>Email <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></label>
+            <label>Email</label>
             <input
               type="email"
               value={form.submitter_email}
               onChange={e => set('submitter_email', e.target.value)}
               placeholder="you@example.com"
+              required
             />
-            <p className="hint">Receive a confirmation with your ticket ID and status link.</p>
+            <p className="hint">So we can send you a confirmation, ask follow-up questions, and let you know when it's done.</p>
           </div>
 
           {error && <p className="error">{error}</p>}

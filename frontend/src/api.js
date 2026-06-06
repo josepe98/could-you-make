@@ -54,6 +54,53 @@ export async function updateTicket(id, data) {
   return res.json()
 }
 
+export async function getAdminMessages(id) {
+  const res = await fetch(`${BASE}/admin/tickets/${id}/messages`, {
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Failed to load messages')
+  }
+  return res.json()
+}
+
+export async function sendAdminMessage(id, body) {
+  const res = await fetch(`${BASE}/admin/tickets/${id}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ body }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Failed to send message')
+  }
+  return res.json()
+}
+
+export async function getPublicMessages(lookupToken) {
+  const res = await fetch(`${BASE}/tickets/${lookupToken}/messages`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Failed to load messages')
+  }
+  return res.json()
+}
+
+export async function sendPublicMessage(lookupToken, body) {
+  const res = await fetch(`${BASE}/tickets/${lookupToken}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Failed to send message')
+  }
+  return res.json()
+}
+
 export async function deleteTicket(id) {
   const res = await fetch(`${BASE}/admin/tickets/${id}`, {
     method: 'DELETE',

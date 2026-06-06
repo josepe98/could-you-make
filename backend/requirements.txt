@@ -8,3 +8,4 @@ pydantic-settings==2.2.1
 python-multipart==0.0.27
 resend==2.29.0
 email-validator==2.1.1
+anthropic==0.92.0
