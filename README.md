@@ -9,10 +9,11 @@ Named after the way people naturally phrase change requests: *"Could you make...
 You run one instance of Could You Make and point each of your apps at it. Each app gets a stable submit URL (`/submit?app=<name>`) you can link to from a help menu, footer, or "Report a problem" button.
 
 **For your users:**
-- Click the link, fill out a short form (title, description, type, urgency, optional email)
-- Get back a private status URL they can bookmark to check on their ticket later
+- Click the link, fill out a short form (title, description, type, urgency, email)
+- Get back a private status URL they can bookmark to check on their ticket later, and receive a confirmation email with the ticket ID
 - No account, no login, no password
-- They never see anyone else's tickets — status pages are reachable only via a 256-bit random token that's emailed and shown once on submission
+- They never see anyone else's tickets — status pages are reachable only via a 256-bit random token. Can reply to admin messages in-app and via email.
+- Get notified when the ticket is resolved with a summary of the conversation
 
 **For you (the admin):**
 - One dashboard at `/admin` shows every ticket from every app
@@ -20,7 +21,9 @@ You run one instance of Could You Make and point each of your apps at it. Each a
 - Inline status editing, drag-to-resize columns in table mode (persisted per browser)
 - Activity chart showing tickets opened and closed per week over the last 12 weeks
 - Per-app ticket ID prefixes (e.g. `BLOG-001`, `STORE-014`) so you can reference tickets unambiguously
-- Optional confirmation emails to submitters via Resend
+- Automated effort estimation: on submission, Sonnet 4.6 drafts a summary and assigns an effort level (Small/Medium/Large/Unknown)
+- In-app messaging: reply to submitters directly from the ticket drawer; conversations surface in confirmation and resolution emails
+- Confirmation and status-change emails to submitters via Resend
 
 The full spec lives in [`REQUIREMENTS.md`](./REQUIREMENTS.md).
 
@@ -66,6 +69,9 @@ export FROM_EMAIL=tickets@your-verified-domain.com
 # Optional: set Reply-To to an inbox you actually read
 # export REPLY_TO=you@example.com
 
+# Optional — only needed for automated effort estimation on submission:
+# export ANTHROPIC_API_KEY=sk-ant-...
+
 uvicorn backend.main:app --reload --port 8001
 ```
 
@@ -101,6 +107,7 @@ Required runtime env vars:
 | `FROM_NAME` | Optional. Display name shown in the From field (e.g. `Could You Make`). If unset, the bare address is used. |
 | `REPLY_TO` | Optional. Sets Reply-To on confirmation emails, e.g. an inbox you actually read. |
 | `BASE_URL` | Public URL of your instance (used in confirmation email links). Defaults to the production URL. |
+| `ANTHROPIC_API_KEY` | Optional, for post-submission effort estimation. When set, Sonnet 4.6 drafts a summary and assigns an effort level. If unset, a warning is logged but submission proceeds normally. |
 | `API_KEY` | Optional. When set, admin endpoints accept `Authorization: Bearer <key>` in addition to the session cookie — used by the MCP server and other programmatic callers. Leave empty to disable bearer-token auth. |
 
 Schema changes are applied at startup via `_run_ddl_migrations()` in `backend/main.py` using `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. There is no Alembic — when you add a new model column, also add a matching `ALTER TABLE` line in that function.
