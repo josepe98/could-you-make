@@ -53,23 +53,26 @@ Frontend pages fetch `/api/apps` via `AppsContext` on mount; there are no hardco
 | `title` | String | Short summary, required |
 | `description` | Text | Full detail, required |
 | `submitter_urgency` | Enum | Low, Medium, High — set by submitter |
+| `submitter_email` | String | Required; used for confirmation email and status-change notifications |
 | `admin_priority` | Enum | Low, Medium, High, Critical — set by admin, null until triaged |
+| `level_of_effort` | Enum | Small, Medium, Large, Unknown — auto-set by LLM on submission, editable by admin |
 | `status` | Enum | Open, In Progress, Done, Won't Fix — default Open |
-| `clarifying_notes` | Text | Optional admin-only notes for triage/context |
-| `submitter_email` | String | Optional; used only for confirmation email |
+| `clarifying_notes` | Text | Optional admin-only notes for triage/context; may be pre-populated with AI draft on submission |
 | `created_at` | Timestamp | Set on creation |
 | `updated_at` | Timestamp | Updated on any change |
 | `resolved_at` | Timestamp | Set when status transitions to Done or Won't Fix; cleared on reopen |
+| `closed_notified_at` | Timestamp | Set when a status-change email is sent on close; cleared on reopen to trigger re-notification |
 
 ---
 
 ## Submit Form (`/submit`)
 
 - URL parameter `app` pre-populates and locks the app field (e.g. `/submit?app=blog`)
-- Fields: Title, Description, Type, Urgency, Email (optional)
+- Fields: Title, Description, Type, Urgency, Email (required)
 - On submit:
   - Ticket is created with an app-specific display ID (e.g. `BLOG-007`) and a random `lookup_token`
-  - If email provided: confirmation email sent via Resend with ticket ID and a link to `/ticket/{lookup_token}`
+  - Confirmation email sent via Resend with ticket ID and a link to `/ticket/{lookup_token}`
+  - If `ANTHROPIC_API_KEY` is set, a background task runs Sonnet 4.6 to draft a summary into `clarifying_notes` (prefixed with `[AI draft]`) and auto-populate `level_of_effort`. Uses adaptive thinking + prompt caching. Errors are logged but do not fail the submission; warns if the key is unset.
   - Submitter sees a confirmation screen with the display ID and a "Track status" link
 - No login required
 - Rate limited to 2 submissions per minute per IP. The IP is keyed on `CF-Connecting-IP` (Cloudflare), falling back to `X-Forwarded-For`, then to the connection IP — see `backend/limiter.py` and the README's "Behind a reverse proxy / CDN" section for the trust model.
@@ -81,8 +84,20 @@ Frontend pages fetch `/api/apps` via `AppsContext` on mount; there are no hardco
 - Publicly accessible but not linked or indexed — only reachable via the `lookup_token` in the confirmation email or success screen
 - Token is random and non-guessable; sequential ticket IDs cannot be enumerated
 - Shows: ticket ID, title, type, app, date submitted, current status
-- Does not show: priority, description, admin notes, submitter email, or any other tickets
+- Shows the original submission and any in-app conversation thread between admin and submitter
+- Does not show: priority, description, internal clarifying notes, submitter email, or any other tickets
 - If token not found: generic not-found message
+- Submitters can reply to admin messages at the bottom of the page; replies trigger an email notification to the admin
+
+---
+
+## In-App Message Thread
+
+Admins and submitters can communicate directly about a ticket without leaving the system.
+
+- **From the admin side:** detail drawer in the dashboard includes a "Messages" section where the admin can send a message to the submitter. Outbound email includes the message body and a link back to the ticket's status page.
+- **From the submitter side:** status page (`/ticket/{lookup_token}`) displays all messages in a conversation thread, with the original submission as an anchor at the top. Submitters can reply inline; replies trigger an email notification to the admin.
+- **Data model:** `ticket_messages` table with sender (admin or submitter), body, and timestamps. Messages are visible in both UIs — the conversation is not split.
 
 ---
 
@@ -98,9 +113,9 @@ Frontend pages fetch `/api/apps` via `AppsContext` on mount; there are no hardco
   - **Table mode:** Split into two tables: **Active** (any status other than Done) on top, **Done** below. Rows animate between the two tables via the View Transitions API when status is toggled across the Done boundary. Columns: ID, App, Type, Title, Urgency (submitter), Priority (admin, inline — currently hidden via `SHOW_PRIORITY_COLUMN` flag in `AdminDashboard.jsx`), Status (inline), Date. Column widths are user-resizable (drag the column edge); widths persist per browser via `localStorage`. Sortable by: Date, Urgency, Priority, Status. Filterable by: App, Type, Status. Title column wraps (not truncated).
   - **Board mode:** Kanban-style view with columns for each status (Open, In Progress, Done, Won't Fix). Cards can be dragged between columns to change status. Filterable by: App, Type.
 - **Ticket detail drawer** (click any row):
-  - Full description
-  - All fields editable: title, type, description, clarifying_notes, priority, status
+  - Full description and all fields editable: title, type, description, clarifying_notes, priority, status, level_of_effort
   - Read-only metadata: app, submitter urgency, email, timestamps
+  - **Messages** section: in-app thread with the submitter. Admin can send a message (which triggers an email to the submitter with a reply link)
   - Save and Delete buttons
 - **Change password** (inline form in dashboard header):
   - Requires current password, new password, confirmation
@@ -114,15 +129,19 @@ Frontend pages fetch `/api/apps` via `AppsContext` on mount; there are no hardco
 
 ## Email (Resend HTTPS API)
 
-- Trigger: ticket submission where submitter provides an email address
+- Triggers: ticket submission (confirmation) and status change to Done or Won't Fix (close notification)
 - Configured via `RESEND_API_KEY` and `FROM_EMAIL` env vars. Optional `REPLY_TO` sets the Reply-To header.
 - Uses Resend's HTTPS API rather than SMTP, because most PaaS providers (notably Railway) block outbound SMTP on every port. HTTPS always works.
 - Sent as a FastAPI `BackgroundTask` so the HTTP response returns immediately, with a 15-second timeout.
 - `FROM_EMAIL` must be on a domain verified in Resend; the address itself does not need to be a real mailbox.
-- Content:
+- **Confirmation email** (on submission):
   - Subject: `Your ticket BLOG-007 has been submitted`
   - Body: ticket display ID, title, type, app, urgency, and a link to `/ticket/{lookup_token}`
-- No status-change notification emails (v1)
+- **Close notification email** (when status → Done or Won't Fix):
+  - Subject: `Your ticket BLOG-007 is resolved`
+  - Body: original submission, admin's decision, and any in-app conversation thread between admin and submitter
+  - Gated by `closed_notified_at` to send only once per close; re-notify if ticket is reopened
+  - Does not expose internal `clarifying_notes` — shows only the conversation thread visible to the submitter
 
 ---
 
@@ -155,10 +174,9 @@ Each integrating app displays a small, unobtrusive link or icon (e.g. a speech b
 
 ---
 
-## Out of Scope (v1)
+## Out of Scope
 
-- Status-change notification emails
-- Submitter accounts or login
+- Submitter accounts or login (tickets are looked up by token only)
 - Public-facing ticket boards or voting
 - Attachments or screenshots
 - Multiple admin users
