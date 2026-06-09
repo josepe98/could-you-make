@@ -144,7 +144,22 @@ async def run_ticket_enrichment(ticket_id: int) -> None:
             return
 
         # Re-fetch in case admin already edited the row during the API call.
-        ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+        # populate_existing() is required: a plain re-query returns the
+        # identity-mapped object loaded before the API call, with stale
+        # (empty) clarifying_notes — which made the append branch below dead
+        # code and clobbered notes added mid-enrichment (CYM-135).
+        # with_for_update() holds a row lock until commit so a concurrent
+        # write can't land between this read and the commit (no-op on SQLite).
+        # of=Ticket locks only the tickets row — app_obj is eager-loaded via
+        # LEFT OUTER JOIN and Postgres can't FOR UPDATE an outer join's
+        # nullable side.
+        ticket = (
+            db.query(Ticket)
+            .filter(Ticket.id == ticket_id)
+            .with_for_update(of=Ticket)
+            .populate_existing()
+            .first()
+        )
         if ticket is None:
             return
 
