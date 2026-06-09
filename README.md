@@ -92,6 +92,15 @@ cd frontend && npm run build
 # now visit http://localhost:8001
 ```
 
+## CI
+
+Every PR (and push to `main`) runs `.github/workflows/ci.yml`, and branch protection on `main` requires both checks before merge:
+
+- **backend** — installs `backend/requirements.txt` and runs `backend/scripts/ci_smoke.py` against a throwaway Postgres service container. Importing the app runs the DDL migrations and seeds, so a clean import catches import-time crashes *and* broken migration SQL; the script then asserts key routes are registered.
+- **frontend** — `npm ci && npm run build` catches JSX/syntax errors and broken imports.
+
+This is deliberately a smoke layer, not a test suite — see CYM-127 for scope.
+
 ## Deploying
 
 The included `Dockerfile` builds a single container that serves both the API and the built frontend. Any host that can run a Dockerfile and provide a Postgres URL will work — Railway, Fly.io, Render, a VPS with Docker, etc.
