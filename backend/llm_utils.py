@@ -150,10 +150,13 @@ async def run_ticket_enrichment(ticket_id: int) -> None:
         # code and clobbered notes added mid-enrichment (CYM-135).
         # with_for_update() holds a row lock until commit so a concurrent
         # write can't land between this read and the commit (no-op on SQLite).
+        # of=Ticket locks only the tickets row — app_obj is eager-loaded via
+        # LEFT OUTER JOIN and Postgres can't FOR UPDATE an outer join's
+        # nullable side.
         ticket = (
             db.query(Ticket)
             .filter(Ticket.id == ticket_id)
-            .with_for_update()
+            .with_for_update(of=Ticket)
             .populate_existing()
             .first()
         )
