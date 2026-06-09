@@ -1,3 +1,4 @@
+import logging
 import secrets
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,16 @@ from .models import AdminPassword, Ticket, App, SEED_APPS
 from .auth import hash_password
 from .config import settings
 from .routers import tickets, admin, apps
+
+# Without a root handler at INFO, Python's last-resort handler drops
+# everything below WARNING, so the cym.* loggers' INFO lines (enrichment
+# heartbeat, email sends) never reached Railway logs — a healthy pipeline
+# was indistinguishable from a silently dead one (CYM-136). Uvicorn's own
+# loggers keep their handlers and don't propagate, so no duplicate lines.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 Base.metadata.create_all(bind=engine)
 
