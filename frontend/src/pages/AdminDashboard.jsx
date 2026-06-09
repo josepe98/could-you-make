@@ -95,25 +95,13 @@ function SortHeader({ label, field, sortBy, sortDir, onSort, onResize }) {
 // ── Stats bar ────────────────────────────────────────────────────────────────
 
 function StatsBar({ tickets }) {
-  const now = Date.now()
-  const oneWeekMs = 7 * 24 * 60 * 60 * 1000
-  const oneWeekAgo = now - oneWeekMs
-  const twoWeeksAgo = now - 2 * oneWeekMs
-
   const count = status => tickets.filter(t => t.status === status).length
-  const thisWeek = tickets.filter(t => new Date(t.created_at).getTime() >= oneWeekAgo).length
-  const lastWeek = tickets.filter(t => {
-    const ms = new Date(t.created_at).getTime()
-    return ms >= twoWeeksAgo && ms < oneWeekAgo
-  }).length
-  const delta = thisWeek - lastWeek
 
   const stats = [
     { label: 'Total', value: tickets.length },
     { label: 'Open', value: count('Open') },
     { label: 'In Progress', value: count('In Progress') },
-    { label: 'Done', value: count('Done') },
-    { label: "Won't Fix", value: count("Won't Fix") },
+    { label: "Done / Won't Fix", value: count('Done') + count("Won't Fix") },
   ]
 
   return (
@@ -132,13 +120,18 @@ function StatsBar({ tickets }) {
 
 function buildWeeklyData(tickets) {
   if (!tickets.length) return []
-  const weekMs = 7 * 24 * 60 * 60 * 1000
-  // Show last 12 weeks
-  const now = Date.now()
+  // Calendar weeks, Monday–Sunday, in local time. Walk back via setDate so
+  // week boundaries stay at midnight across DST changes.
+  const currentWeekStart = new Date()
+  currentWeekStart.setHours(0, 0, 0, 0)
+  currentWeekStart.setDate(currentWeekStart.getDate() - ((currentWeekStart.getDay() + 6) % 7))
+  // Show last 12 weeks, including the current (partial) one
   const weeks = Array.from({ length: 12 }, (_, i) => {
-    const end = now - i * weekMs
-    const start = end - weekMs
-    return { start, end }
+    const start = new Date(currentWeekStart)
+    start.setDate(start.getDate() - 7 * i)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 7)
+    return { start: start.getTime(), end: end.getTime() }
   }).reverse()
 
   return weeks.map(({ start, end }) => {
@@ -168,7 +161,7 @@ function ActivityModal({ tickets, onClose }) {
           <button className="btn btn-secondary btn-sm" onClick={onClose}>✕</button>
         </div>
         <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 20 }}>
-          Tickets opened and closed per week (last 12 weeks). Closed = moved to Done or Won't Fix.
+          Tickets opened and closed per calendar week, Mon–Sun (last 12 weeks; current week is partial). Closed = moved to Done or Won't Fix. Labels show the Monday each week starts.
         </p>
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={data} barCategoryGap="30%" barGap={3}>
