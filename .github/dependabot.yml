@@ -4,12 +4,28 @@ updates:
     directory: "/backend"
     schedule:
       interval: "weekly"
+      day: "monday"
     labels:
       - "dependencies"
+    groups:
+      backend-routine:
+        applies-to: version-updates
+        update-types: ["patch", "minor"]
+      backend-security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
+      day: "monday"
     labels:
       - "dependencies"
+    groups:
+      frontend-routine:
+        applies-to: version-updates
+        update-types: ["patch", "minor"]
+      frontend-security:
+        applies-to: security-updates
+        patterns: ["*"]
