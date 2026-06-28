@@ -281,6 +281,19 @@ def create_ticket_message(
             status_code=400,
             detail="Ticket has no submitter_email — cannot send a message.",
         )
+    # Snapshot the prior thread BEFORE inserting the new message so the
+    # email's history section doesn't duplicate the message rendered at the top.
+    prior_rows = (
+        db.query(TicketMessage)
+        .filter(TicketMessage.ticket_id == ticket.id)
+        .order_by(TicketMessage.created_at.asc())
+        .all()
+    )
+    prior_thread = [
+        {"direction": m.direction, "body": m.body, "created_at": m.created_at}
+        for m in prior_rows
+    ]
+
     msg = TicketMessage(
         ticket_id=ticket.id,
         direction="admin",
@@ -297,6 +310,9 @@ def create_ticket_message(
         lookup_token=ticket.lookup_token,
         title=ticket.title,
         message_body=payload.body,
+        description=ticket.description,
+        submitted_at=ticket.created_at,
+        prior_thread=prior_thread,
     )
     return msg
 
