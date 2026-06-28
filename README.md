@@ -172,5 +172,4 @@ If you put Cloudflare (or any reverse proxy) in front, the rate limiter needs to
 - **Single tenant.** One admin user, one set of apps. There's no multi-tenancy and no plans for it.
 - **Single instance.** Rate limiting and sessions are storage-backed but rate-limit counters are in process memory. If you scale horizontally you'll need to move slowapi to a Redis backend (`storage_uri="redis://..."`).
 - **No file attachments.** Submissions are text only. By design — keeps the threat surface and the storage story simple.
-- **No status-change emails.** Submitters get one confirmation email on creation; they have to revisit their status URL to see updates.
 - **No real migration system.** See the deploy section above. Fine for a small project; replace with Alembic if you want anything more sophisticated.
