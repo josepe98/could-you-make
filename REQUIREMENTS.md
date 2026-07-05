@@ -154,7 +154,7 @@ Each integrating app displays a small, unobtrusive link or icon (e.g. a speech b
 ## Tech Stack
 
 - **Backend**: Python / FastAPI, PostgreSQL, SQLAlchemy, slowapi (rate limiting)
-- **Frontend**: React 18, Vite, React Router
+- **Frontend**: React 19, Vite 8, React Router
 - **Email**: Resend HTTPS API (via the `resend` Python SDK)
 - **Packaging**: multi-stage Dockerfile (single container serves API + built frontend)
 

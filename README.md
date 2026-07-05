@@ -32,7 +32,7 @@ The full spec lives in [`REQUIREMENTS.md`](./REQUIREMENTS.md).
 - **Backend**: Python 3.12 / FastAPI / SQLAlchemy / PostgreSQL
   - slowapi for rate limiting
   - Resend HTTPS API for confirmation emails (any host that allows outbound HTTPS — including PaaS that block outbound SMTP)
-- **Frontend**: React 18 / Vite / React Router
+- **Frontend**: React 19 / Vite 8 / React Router
 - **Build / deploy**: multi-stage Dockerfile (Node builds the frontend, Python slim serves the FastAPI app + built bundle from a single container)
 
 ## Configuring your apps
