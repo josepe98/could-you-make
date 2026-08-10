@@ -26,10 +26,14 @@ EXPECTED_ROUTES = {
     ("POST", "/api/admin/apps"),
 }
 
+# fastapi >= 0.141 includes routers lazily (_IncludedRouter), so app.routes no
+# longer yields flattened objects with .path/.methods; the OpenAPI schema is the
+# stable public view of registered routes on both old and new fastapi.
 registered = {
-    (method, route.path)
-    for route in app.routes
-    for method in getattr(route, "methods", set())
+    (method.upper(), path)
+    for path, ops in app.openapi().get("paths", {}).items()
+    for method in ops
+    if method.lower() in {"get", "post", "put", "patch", "delete", "head", "options"}
 }
 
 missing = EXPECTED_ROUTES - registered
