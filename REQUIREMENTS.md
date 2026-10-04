@@ -55,7 +55,7 @@ Frontend pages fetch `/api/apps` via `AppsContext` on mount; there are no hardco
 | `submitter_urgency` | Enum | Low, Medium, High — set by submitter |
 | `submitter_email` | String | Required; used for confirmation email and status-change notifications |
 | `admin_priority` | Enum | Low, Medium, High, Critical — set by admin, null until triaged |
-| `level_of_effort` | Enum | Small, Medium, Large, Unknown — auto-set by LLM on submission, editable by admin |
+| `level_of_effort` | Enum | XS, S, M, L, XL — auto-set by LLM on submission, editable by admin |
 | `status` | Enum | Open, In Progress, Done, Won't Fix — default Open |
 | `clarifying_notes` | Text | Optional admin-only notes for triage/context; may be pre-populated with AI draft on submission |
 | `created_at` | Timestamp | Set on creation |
