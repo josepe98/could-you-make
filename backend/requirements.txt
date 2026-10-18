@@ -2,6 +2,9 @@ fastapi==0.141.1
 slowapi==0.1.10
 uvicorn[standard]==0.53.0
 sqlalchemy==2.0.54
+# psycopg (v3) is what SQLAlchemy 2.1+ picks for bare postgresql:// URLs;
+# psycopg2-binary stays for scripts/refresh_staging.py which imports psycopg2 directly.
+psycopg[binary]==3.3.6
 psycopg2-binary==2.9.13
 pydantic[email]==2.13.5
 pydantic-settings==2.15.0
