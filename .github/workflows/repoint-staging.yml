@@ -10,6 +10,12 @@ concurrency:
 
 jobs:
   repoint-staging:
+    # GitHub withholds repo secrets from dependabot-triggered runs, so this job
+    # can only fail there (empty RAILWAY_API_TOKEN -> "Not Authorized"), putting
+    # a red X on every dependabot PR. Skip those runs: staging is never pointed
+    # at dependabot branches, and when a human merges/closes a dependabot PR the
+    # actor is the human, so the repoint back to main still runs with secrets.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Determine target branch
