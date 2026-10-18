@@ -1,14 +1,14 @@
-fastapi==0.141.1
+fastapi==0.143.1
 slowapi==0.1.10
-uvicorn[standard]==0.53.0
-sqlalchemy==2.0.54
+uvicorn[standard]==0.54.0
+sqlalchemy==2.1.4
 # psycopg (v3) is what SQLAlchemy 2.1+ picks for bare postgresql:// URLs;
 # psycopg2-binary stays for scripts/refresh_staging.py which imports psycopg2 directly.
 psycopg[binary]==3.3.6
 psycopg2-binary==2.9.13
-pydantic[email]==2.13.5
-pydantic-settings==2.15.0
+pydantic[email]==2.14.1
+pydantic-settings==2.16.0
 python-multipart==0.0.32
-resend==2.46.0
+resend==2.49.1
 email-validator==2.3.0
 anthropic==0.92.0
