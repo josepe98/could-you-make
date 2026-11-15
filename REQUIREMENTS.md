@@ -112,7 +112,8 @@ Admins and submitters can communicate directly about a ticket without leaving th
   - Two view modes: **Table** and **Board**. View preference persists per browser.
   - **Table mode:** Split into two tables: **Active** (any status other than Done) on top, **Done** below. Rows animate between the two tables via the View Transitions API when status is toggled across the Done boundary. Columns: ID, App, Type, Title, Urgency (submitter), Priority (admin, inline — currently hidden via `SHOW_PRIORITY_COLUMN` flag in `AdminDashboard.jsx`), Status (inline), Date. Column widths are user-resizable (drag the column edge); widths persist per browser via `localStorage`. Sortable by: Date, Urgency, Priority, Status. Filterable by: App, Type, Status. Title column wraps (not truncated).
   - **Board mode:** Kanban-style view with columns for each status (Open, In Progress, Done, Won't Fix). Cards can be dragged between columns to change status. Filterable by: App, Type.
-- **Ticket detail drawer** (click any row):
+- **Ticket detail panel** (click any row):
+  - Full-width panel filling the browser window, with content centered at up to ~1200px on wide screens for readable line lengths
   - Full description and all fields editable: title, type, description, clarifying_notes, priority, status, level_of_effort
   - Read-only metadata: app, submitter urgency, email, timestamps
   - **Messages** section: in-app thread with the submitter. Admin can send a message (which triggers an email to the submitter with a reply link)
